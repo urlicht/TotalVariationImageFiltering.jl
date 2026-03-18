@@ -265,30 +265,40 @@ function build_cpu_suite!(suite::BenchmarkGroup, cases; quick::Bool)
 end
 
 function maybe_load_cuda()
-    try
+    cuda_mod = try
         @eval using CUDA
+        getfield(Main, :CUDA)
     catch err
         @info "CUDA.jl not available; skipping GPU benchmarks." error = err
-        return false
+        return nothing
     end
 
-    if !CUDA.functional()
+    functional = try
+        Base.invokelatest(getproperty(cuda_mod, :functional))
+    catch err
+        @info "CUDA loaded but functional() failed; skipping GPU benchmarks." error = err
+        return nothing
+    end
+
+    if !functional
         @info "CUDA is installed but no functional device was detected; skipping GPU benchmarks."
-        return false
+        return nothing
     end
 
-    return true
+    return cuda_mod
 end
 
-function build_gpu_suite!(suite::BenchmarkGroup, cases; quick::Bool)
+function build_gpu_suite!(suite::BenchmarkGroup, cases, cuda_mod::Module; quick::Bool)
     suite["gpu"] = BenchmarkGroup()
     gpu_group = suite["gpu"]
 
     maxiter = quick ? 120 : 240
     gpu_cases = filter(case -> ndims(case.noisy) == 2 && case.gpu, cases)
+    cu = getproperty(cuda_mod, :cu)
+    synchronize = getproperty(cuda_mod, :synchronize)
 
     for case in gpu_cases
-        noisy_gpu = CUDA.cu(case.noisy)
+        noisy_gpu = Base.invokelatest(cu, case.noisy)
 
         problem = TVImageFiltering.TVProblem(
             noisy_gpu;
@@ -308,15 +318,20 @@ function build_gpu_suite!(suite::BenchmarkGroup, cases; quick::Bool)
         u_gpu = similar(noisy_gpu)
         state = TVImageFiltering.ROFState(noisy_gpu)
 
-        subgroup["solve (allocating)"] =
-            @benchmarkable CUDA.@sync TVImageFiltering.solve($problem, $config)
+        subgroup["solve (allocating)"] = @benchmarkable begin
+            TVImageFiltering.solve($problem, $config)
+            Base.invokelatest($synchronize)
+        end
         subgroup["solve! (state reuse)"] =
-            @benchmarkable CUDA.@sync TVImageFiltering.solve!(
+            @benchmarkable begin
+                TVImageFiltering.solve!(
                 $u_gpu,
                 $problem,
                 $config;
                 state = $state,
-            ) setup = (copyto!($u_gpu, $noisy_gpu); CUDA.synchronize())
+            )
+                Base.invokelatest($synchronize)
+            end setup = (copyto!($u_gpu, $noisy_gpu); Base.invokelatest($synchronize))
     end
 
     return nothing
@@ -430,7 +445,8 @@ function main(args::Vector{String})
     build_cpu_suite!(suite, cases; quick = opts.quick)
 
     if opts.run_gpu
-        maybe_load_cuda() && build_gpu_suite!(suite, cases; quick = opts.quick)
+        cuda_mod = maybe_load_cuda()
+        cuda_mod === nothing || build_gpu_suite!(suite, cases, cuda_mod; quick = opts.quick)
     end
 
     println("Running TVImageFiltering benchmarks...")
