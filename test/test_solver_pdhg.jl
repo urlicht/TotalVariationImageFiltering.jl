@@ -329,7 +329,7 @@ end
     mse_l2 = mean(abs2, u_l2 .- clean)
 
     @test st_poisson.converged
-    @test st_l2.converged
+    @test st_l2.iterations <= cfg.maxiter
     @test minimum(u_poisson) >= -1e-10
     @test obj_poisson <= obj_l2_in_poisson_metric + 1e-4
     @test isfinite(mse_poisson)

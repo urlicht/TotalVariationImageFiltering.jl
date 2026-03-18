@@ -22,7 +22,7 @@ Fields:
 - `tau`: primal step size.
 - `sigma`: dual step size.
 - `theta`: over-relaxation in `[0, 1]`.
-- `tol`: stopping tolerance on relative primal change.
+- `tol`: stopping tolerance on `max(relative_primal_change, primal_dual_residual)`.
 - `check_every`: evaluate convergence every `check_every` iterations.
 
 References:
@@ -86,6 +86,7 @@ struct PDHGState{T<:AbstractFloat,N,A<:AbstractArray{T,N},G<:NTuple{N,A}}
     divp::A
     primal_tmp::A
     p::G
+    p_prev::G
     grad_u_bar::G
 end
 
@@ -96,6 +97,7 @@ function PDHGState(reference::AbstractArray{T,N}) where {T<:AbstractFloat,N}
     divp = similar(reference)
     primal_tmp = similar(reference)
     p = allocate_dual(reference)
+    p_prev = allocate_dual(reference)
     grad_u_bar = allocate_dual(reference)
 
     fill!(u, zero(T))
@@ -105,6 +107,7 @@ function PDHGState(reference::AbstractArray{T,N}) where {T<:AbstractFloat,N}
     fill!(primal_tmp, zero(T))
     @inbounds for d = 1:N
         fill!(p[d], zero(T))
+        fill!(p_prev[d], zero(T))
         fill!(grad_u_bar[d], zero(T))
     end
 
@@ -115,6 +118,7 @@ function PDHGState(reference::AbstractArray{T,N}) where {T<:AbstractFloat,N}
         divp,
         primal_tmp,
         p,
+        p_prev,
         grad_u_bar,
     )
 end
@@ -211,10 +215,43 @@ function _validate_state_shape(
     @inbounds for d = 1:N
         size(state.p[d]) == shape ||
             throw(ArgumentError("state.p[$d] size must match solve buffer size $shape"))
+        size(state.p_prev[d]) == shape ||
+            throw(ArgumentError("state.p_prev[$d] size must match solve buffer size $shape"))
         size(state.grad_u_bar[d]) == shape ||
             throw(ArgumentError("state.grad_u_bar[$d] size must match solve buffer size $shape"))
     end
     return nothing
+end
+
+function _pdhg_relative_residual!(
+    state::PDHGState{T,N},
+    problem::TVProblem{T,N},
+    tau::T,
+    sigma::T,
+    inv_spacing::NTuple{N,T},
+) where {T<:AbstractFloat,N}
+    @inbounds for d = 1:N
+        @. state.grad_u_bar[d] = state.p_prev[d] - state.p[d]
+    end
+
+    divergence!(state.primal_tmp, state.grad_u_bar, problem.boundary, inv_spacing)
+
+    @. state.divp = state.u_prev - state.u
+
+    @. state.primal_tmp = state.divp / tau - state.primal_tmp
+    primal_res_norm = T(sqrt(sum(abs2, state.primal_tmp)))
+
+    gradient!(state.grad_u_bar, state.divp, problem.boundary, inv_spacing)
+    dual_res_norm2 = zero(T)
+    @inbounds for d = 1:N
+        ad = state.grad_u_bar[d]
+        @. ad = (state.p_prev[d] - state.p[d]) / sigma - ad
+        dual_res_norm2 += sum(abs2, ad)
+    end
+
+    dual_res_norm = T(sqrt(dual_res_norm2))
+    nscale = sqrt(T(length(state.u)))
+    return max(primal_res_norm, dual_res_norm) / max(nscale, one(T))
 end
 
 """
@@ -230,6 +267,11 @@ State and buffer reuse:
   `copyto!(problem.f, new_f)` and call `solve!` again.
 - If image array object, shape/eltype, or problem metadata changes, create a
   new `TVProblem` (and a new `PDHGState` only when shape/eltype changes).
+
+Stopping criterion:
+- `solve!` checks both relative primal change and a PDHG primal-dual residual.
+- The primal-dual residual is normalized by `sqrt(length(u))`.
+- Convergence uses `max(relative_primal_change, primal_dual_residual) <= tol`.
 """
 function solve!(
     u::AbstractArray{T,N},
@@ -277,6 +319,9 @@ function solve!(
 
     for k = 1:config.maxiter
         copyto!(local_state.u_prev, local_state.u)
+        @inbounds for d = 1:N
+            copyto!(local_state.p_prev[d], local_state.p[d])
+        end
 
         gradient!(local_state.grad_u_bar, local_state.u_bar, problem.boundary, inv_spacing)
         @inbounds for d = 1:N
@@ -296,7 +341,15 @@ function solve!(
         @. local_state.u_bar = local_state.u + theta_t * (local_state.u - local_state.u_prev)
 
         if (k % config.check_every == 0) || (k == config.maxiter)
-            rel_change = _relative_change(local_state.u_prev, local_state.u)
+            primal_rel_change = _relative_change(local_state.u_prev, local_state.u)
+            pdhg_residual = _pdhg_relative_residual!(
+                local_state,
+                problem,
+                tau_t,
+                sigma_t,
+                inv_spacing,
+            )
+            rel_change = max(primal_rel_change, pdhg_residual)
             if rel_change <= T(config.tol)
                 converged = true
                 iterations = k
