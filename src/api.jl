@@ -33,6 +33,7 @@ function solve_batch(
     data_fidelity::AbstractDataFidelity = L2Fidelity(),
     tv_mode::AbstractTVMode = IsotropicTV(),
     boundary::AbstractBoundaryCondition = Neumann(),
+    constraint::AbstractPrimalConstraint = NoConstraint(),
     init::Union{Nothing,AbstractArray} = nothing,
     state = nothing,
 ) where {T<:AbstractFloat,N}
@@ -51,6 +52,7 @@ function solve_batch(
         data_fidelity = data_fidelity,
         tv_mode = tv_mode,
         boundary = boundary,
+        constraint = constraint,
         state = state,
     )
     return u_batch, stats
@@ -74,12 +76,18 @@ function solve_batch!(
     data_fidelity::AbstractDataFidelity = L2Fidelity(),
     tv_mode::AbstractTVMode = IsotropicTV(),
     boundary::AbstractBoundaryCondition = Neumann(),
+    constraint::AbstractPrimalConstraint = NoConstraint(),
     state = nothing,
 ) where {T<:AbstractFloat,N}
     N >= 2 ||
         throw(ArgumentError("f_batch must have at least 2 dimensions (spatial..., batch)"))
     size(u_batch) == size(f_batch) ||
         throw(ArgumentError("u_batch and f_batch must have matching sizes"))
+    constraint isa NoConstraint || throw(
+        ArgumentError(
+            "ROF currently supports only unconstrained problems; set constraint = NoConstraint() or use PDHGConfig",
+        ),
+    )
 
     batch_count = size(f_batch, N)
     local_states = if state === nothing
@@ -107,6 +115,7 @@ function solve_batch!(
             data_fidelity = data_fidelity,
             tv_mode = tv_mode,
             boundary = boundary,
+            constraint = constraint,
         )
 
         stats =
@@ -130,6 +139,7 @@ function solve_batch!(
     data_fidelity::AbstractDataFidelity = L2Fidelity(),
     tv_mode::AbstractTVMode = IsotropicTV(),
     boundary::AbstractBoundaryCondition = Neumann(),
+    constraint::AbstractPrimalConstraint = NoConstraint(),
     state = nothing,
 ) where {T<:AbstractFloat,N}
     N >= 2 ||
@@ -163,6 +173,7 @@ function solve_batch!(
             data_fidelity = data_fidelity,
             tv_mode = tv_mode,
             boundary = boundary,
+            constraint = constraint,
         )
 
         stats =

@@ -8,7 +8,8 @@ TV-based reconstruction/denoising
 For repeated solves on same shape/eltype data, mutate `f` in place (for example,
 `copyto!(problem.f, new_f)`) and reuse the same `TVProblem`.
 If you need a different `f` array object or different metadata (`lambda`,
-`spacing`, `data_fidelity`, `tv_mode`, `boundary`), construct a new `TVProblem`.
+`spacing`, `data_fidelity`, `tv_mode`, `boundary`, `constraint`), construct a
+new `TVProblem`.
 """
 struct TVProblem{
     T<:AbstractFloat,
@@ -17,6 +18,7 @@ struct TVProblem{
     DF<:AbstractDataFidelity,
     TV<:AbstractTVMode,
     BC<:AbstractBoundaryCondition,
+    PC<:AbstractPrimalConstraint,
 }
     f::AF
     lambda::T
@@ -24,6 +26,7 @@ struct TVProblem{
     data_fidelity::DF
     tv_mode::TV
     boundary::BC
+    constraint::PC
 end
 
 function _normalize_spacing(
@@ -80,6 +83,40 @@ function _normalize_spacing(::Type{T}, ::Val{N}, spacing) where {T<:AbstractFloa
     )
 end
 
+function _normalize_constraint(
+    ::Type{T},
+    constraint::NoConstraint,
+) where {T<:AbstractFloat}
+    return constraint
+end
+
+function _normalize_constraint(
+    ::Type{T},
+    constraint::NonnegativeConstraint,
+) where {T<:AbstractFloat}
+    return constraint
+end
+
+function _normalize_constraint(
+    ::Type{T},
+    constraint::BoxConstraint,
+) where {T<:AbstractFloat}
+    lower_t = T(constraint.lower)
+    upper_t = T(constraint.upper)
+    return BoxConstraint(lower_t, upper_t)
+end
+
+function _normalize_constraint(
+    ::Type{T},
+    constraint::AbstractPrimalConstraint,
+) where {T<:AbstractFloat}
+    throw(
+        ArgumentError(
+            "unsupported constraint type $(typeof(constraint)); supported: NoConstraint, NonnegativeConstraint, BoxConstraint",
+        ),
+    )
+end
+
 function TVProblem(
     f::AbstractArray{T,N};
     lambda::Real,
@@ -87,16 +124,27 @@ function TVProblem(
     data_fidelity::AbstractDataFidelity = L2Fidelity(),
     tv_mode::AbstractTVMode = IsotropicTV(),
     boundary::AbstractBoundaryCondition = Neumann(),
+    constraint::AbstractPrimalConstraint = NoConstraint(),
 ) where {T<:AbstractFloat,N}
     lambda_t = T(lambda)
     lambda_t >= zero(T) || throw(ArgumentError("lambda must be non-negative"))
     spacing_t = _normalize_spacing(T, Val(N), spacing)
-    return TVProblem{T,N,typeof(f),typeof(data_fidelity),typeof(tv_mode),typeof(boundary)}(
+    constraint_t = _normalize_constraint(T, constraint)
+    return TVProblem{
+        T,
+        N,
+        typeof(f),
+        typeof(data_fidelity),
+        typeof(tv_mode),
+        typeof(boundary),
+        typeof(constraint_t),
+    }(
         f,
         lambda_t,
         spacing_t,
         data_fidelity,
         tv_mode,
         boundary,
+        constraint_t,
     )
 end
