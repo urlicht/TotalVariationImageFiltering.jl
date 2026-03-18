@@ -7,7 +7,7 @@ end
 
 function ROFConfig(;
     maxiter::Int = 300,
-    tau::Real = 0.0625,
+    tau::Real = 0.0625, # τ = 0.25 max for 2D, see 2nd remark after proof of Theorem 3.1.
     tol::Real = 1e-4,
     check_every::Int = 10,
 )
