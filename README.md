@@ -1,5 +1,6 @@
 # TVImageFiltering.jl
 [![CI](https://github.com/urlicht/TVImageFiltering.jl/actions/workflows/ci.yml/badge.svg)](https://github.com/urlicht/TVImageFiltering.jl/actions/workflows/ci.yml)
+[![Docs](https://img.shields.io/badge/docs-latest-blue.svg)](https://urlicht.github.io/TVImageFiltering.jl/)
 
 `TVImageFiltering.jl` is a Julia package for total-variation (TV) image denoising and reconstruction.
 
