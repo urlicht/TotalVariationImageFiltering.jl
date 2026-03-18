@@ -26,6 +26,11 @@ L2 data fidelity, `0.5 * ||u - f||^2`.
 """
 struct L2Fidelity <: AbstractDataFidelity end
 
+"""
+Poisson negative log-likelihood fidelity, `sum(u - f * log(u))` up to constants.
+"""
+struct PoissonFidelity <: AbstractDataFidelity end
+
 #
 # TVMode (pixel/voxel) isotropy
 #
