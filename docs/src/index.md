@@ -8,7 +8,7 @@ reconstruction on `N`-dimensional arrays.
 
 It currently provides:
 
-- ROF denoising (`L2 + TV`) via Chambolle's dual projection algorithm.
+- ROF denoising (`L2 + TV`) via a Chambolle-style dual projected-gradient algorithm.
 - PDHG / Chambolle-Pock for `L2 + TV` and Poisson `KL + TV`.
 - PDHG primal constraints: non-negativity and box constraints.
 - Isotropic and anisotropic TV.

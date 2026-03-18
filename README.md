@@ -27,7 +27,7 @@ Recommended entry points:
 
 ## Features
 
-- ROF denoising (`L2 + TV`) with Chambolle dual projection
+- ROF denoising (`L2 + TV`) with a Chambolle-style dual projected-gradient method
 - PDHG / Chambolle-Pock for `L2 + TV` and Poisson `KL + TV`
 - PDHG primal constraints: non-negativity and box constraints
 - Isotropic and anisotropic TV

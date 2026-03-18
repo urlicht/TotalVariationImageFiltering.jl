@@ -174,7 +174,8 @@ State and buffer reuse:
 - If image array object, shape/eltype, or problem metadata changes, create a
   new `TVProblem` (and a new `ROFState` only when shape/eltype changes).
 
-The implementation follows Chambolle's dual projection method for the ROF model.
+The implementation uses a Chambolle-style dual projected-gradient method for the
+ROF model.
 With dual variable `p` and image `f`, each iteration computes:
 
     g^k = div(p^k) - f / lambda

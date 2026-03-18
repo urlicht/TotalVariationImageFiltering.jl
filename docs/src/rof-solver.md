@@ -20,10 +20,10 @@ unconstrained problems (`constraint = NoConstraint()`).
 
 For non-negativity or box constraints, use `PDHGConfig`.
 
-## Dual-Projection Iteration (Chambolle)
+## Dual Projected-Gradient Iteration (Chambolle-Style)
 
-The implementation follows a dual ascent + projection scheme. For dual field `p`,
-each iteration computes:
+The implementation uses a dual projected-gradient scheme for the ROF dual
+formulation. For dual field `p`, each iteration computes:
 
 ```math
 g^k = \operatorname{div}(p^k) - \frac{f}{\lambda},
