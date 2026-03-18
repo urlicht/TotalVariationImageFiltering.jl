@@ -189,7 +189,7 @@ end
 
     bad_boundary_prob =
         TVImageFiltering.TVProblem(f; lambda = 0.2, boundary = DummyBoundaryForROF())
-    @test_throws MethodError TVImageFiltering.solve(bad_boundary_prob)
+    @test_throws ArgumentError TVImageFiltering.solve(bad_boundary_prob)
 
     mismatch_prob = TVImageFiltering.TVProblem(randn(6); lambda = 0.2)
     @test_throws ArgumentError TVImageFiltering.solve!(

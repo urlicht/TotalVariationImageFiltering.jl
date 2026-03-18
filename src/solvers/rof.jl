@@ -211,6 +211,8 @@ function solve!(
             "ROF currently supports only unconstrained problems; set constraint = NoConstraint() or use PDHGConfig",
         ),
     )
+    problem.boundary isa Neumann ||
+        throw(ArgumentError("ROF currently supports only Neumann boundary"))
     size(u) == size(problem.f) ||
         throw(ArgumentError("You must have the same size as problem.f"))
     problem.lambda >= zero(T) ||
