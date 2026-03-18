@@ -190,4 +190,25 @@ end
         mismatch_prob,
         TVImageFiltering.ROFConfig(),
     )
+
+    bad_state = TVImageFiltering.ROFState(randn(6))
+    @test_throws ArgumentError TVImageFiltering.solve(
+        TVImageFiltering.TVProblem(randn(8); lambda = 0.2),
+        TVImageFiltering.ROFConfig();
+        state = bad_state,
+    )
+
+    # Bypass keyword constructor checks by calling the positional struct constructor directly.
+    negative_lambda_prob = TVImageFiltering.TVProblem(
+        randn(8),
+        -0.2,
+        (1.0,),
+        TVImageFiltering.L2Fidelity(),
+        TVImageFiltering.IsotropicTV(),
+        TVImageFiltering.Neumann(),
+    )
+    @test_throws ArgumentError TVImageFiltering.solve(
+        negative_lambda_prob,
+        TVImageFiltering.ROFConfig(),
+    )
 end

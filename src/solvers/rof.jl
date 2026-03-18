@@ -95,6 +95,25 @@ function _relative_change(
     return T(sqrt(sum(abs2, u .- u_prev)) / max(sqrt(sum(abs2, u_prev)), eps(T)))
 end
 
+function _validate_state_shape(state::ROFState{T,N}, shape::NTuple{N,Int}) where {T<:AbstractFloat,N}
+    size(state.u) == shape ||
+        throw(ArgumentError("state.u size must match solve buffer size $shape"))
+    size(state.u_prev) == shape ||
+        throw(ArgumentError("state.u_prev size must match solve buffer size $shape"))
+    size(state.divp) == shape ||
+        throw(ArgumentError("state.divp size must match solve buffer size $shape"))
+    size(state.g) == shape ||
+        throw(ArgumentError("state.g size must match solve buffer size $shape"))
+
+    @inbounds for d = 1:N
+        size(state.p[d]) == shape ||
+            throw(ArgumentError("state.p[$d] size must match solve buffer size $shape"))
+        size(state.grad_g[d]) == shape ||
+            throw(ArgumentError("state.grad_g[$d] size must match solve buffer size $shape"))
+    end
+    return nothing
+end
+
 function _rof_dual_step!(
     state::ROFState{T,N},
     problem::TVProblem{T,N},
@@ -184,13 +203,18 @@ function solve!(
         throw(ArgumentError("ROF currently supports only L2Fidelity"))
     size(u) == size(problem.f) ||
         throw(ArgumentError("You must have the same size as problem.f"))
+    problem.lambda >= zero(T) ||
+        throw(ArgumentError("lambda must be non-negative, got $(problem.lambda)"))
+
+    local_state = state === nothing ? nothing : state
+    local_state === nothing || _validate_state_shape(local_state, size(u))
 
     if problem.lambda == zero(T)
         copyto!(u, problem.f)
         return SolverStats{T}(0, true, zero(T))
     end
 
-    local_state = state === nothing ? ROFState(problem.f) : state
+    local_state = local_state === nothing ? ROFState(problem.f) : local_state
 
     copyto!(local_state.u, u)
     rel_change = T(Inf)
