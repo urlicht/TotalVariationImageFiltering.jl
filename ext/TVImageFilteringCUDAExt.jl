@@ -539,6 +539,49 @@ function _rof_batch_dual_step!(
     return nothing
 end
 
+function _zero_batch_stats(
+    ::Type{T},
+    batch_count::Int,
+    return_per_item_stats::Bool,
+) where {T<:AbstractFloat}
+    summary_stats = SolverStats{T}(0, true, zero(T))
+    if return_per_item_stats
+        per_item_stats = Vector{SolverStats{T}}(undef, batch_count)
+        @inbounds for b = 1:batch_count
+            per_item_stats[b] = SolverStats{T}(0, true, zero(T))
+        end
+        return summary_stats, per_item_stats
+    end
+    return summary_stats
+end
+
+function _batch_stats_result(
+    ::Type{T},
+    iterations_per_slice::Vector{Int},
+    rel_changes::Vector{T},
+    done_host::Vector{UInt8},
+    converged_all::Bool,
+    return_per_item_stats::Bool,
+) where {T<:AbstractFloat}
+    summary_stats = SolverStats{T}(
+        maximum(iterations_per_slice),
+        converged_all,
+        maximum(rel_changes),
+    )
+    if return_per_item_stats
+        per_item_stats = Vector{SolverStats{T}}(undef, length(iterations_per_slice))
+        @inbounds for b = 1:length(iterations_per_slice)
+            per_item_stats[b] = SolverStats{T}(
+                iterations_per_slice[b],
+                done_host[b] == UInt8(1),
+                rel_changes[b],
+            )
+        end
+        return summary_stats, per_item_stats
+    end
+    return summary_stats
+end
+
 function solve_batch!(
     u_batch::CUDA.CuArray{T,N},
     f_batch::CUDA.CuArray{T,N},
@@ -550,6 +593,7 @@ function solve_batch!(
     boundary::AbstractBoundaryCondition = Neumann(),
     constraint::AbstractPrimalConstraint = NoConstraint(),
     state = nothing,
+    return_per_item_stats::Bool = false,
 ) where {T<:AbstractFloat,N}
     N >= 2 ||
         throw(ArgumentError("f_batch must have at least 2 dimensions (spatial..., batch)"))
@@ -558,7 +602,7 @@ function solve_batch!(
     batch_count = size(f_batch, N)
     if batch_count == 0
         copyto!(u_batch, f_batch)
-        return SolverStats{T}(0, true, zero(T))
+        return _zero_batch_stats(T, 0, return_per_item_stats)
     end
 
     TVImageFiltering._validate(config)
@@ -576,7 +620,7 @@ function solve_batch!(
     lambda_t >= zero(T) || throw(ArgumentError("lambda must be non-negative"))
     if lambda_t == zero(T)
         copyto!(u_batch, f_batch)
-        return SolverStats{T}(0, true, zero(T))
+        return _zero_batch_stats(T, batch_count, return_per_item_stats)
     end
 
     spatial_ndims = N - 1
@@ -647,10 +691,13 @@ function solve_batch!(
 
             if active_count == 0
                 copyto!(u_batch, local_state.u)
-                return SolverStats{T}(
-                    maximum(iterations_per_slice),
+                return _batch_stats_result(
+                    T,
+                    iterations_per_slice,
+                    rel_changes,
+                    done_host,
                     true,
-                    maximum(rel_changes),
+                    return_per_item_stats,
                 )
             end
 
@@ -662,7 +709,14 @@ function solve_batch!(
     end
 
     copyto!(u_batch, local_state.u)
-    return SolverStats{T}(maximum(iterations_per_slice), false, maximum(rel_changes))
+    return _batch_stats_result(
+        T,
+        iterations_per_slice,
+        rel_changes,
+        done_host,
+        false,
+        return_per_item_stats,
+    )
 end
 
 function solve!(
@@ -1017,6 +1071,7 @@ function solve_batch!(
     boundary::AbstractBoundaryCondition = Neumann(),
     constraint::AbstractPrimalConstraint = NoConstraint(),
     state = nothing,
+    return_per_item_stats::Bool = false,
 ) where {T<:AbstractFloat,N}
     N >= 2 ||
         throw(ArgumentError("f_batch must have at least 2 dimensions (spatial..., batch)"))
@@ -1025,7 +1080,7 @@ function solve_batch!(
     batch_count = size(f_batch, N)
     if batch_count == 0
         copyto!(u_batch, f_batch)
-        return SolverStats{T}(0, true, zero(T))
+        return _zero_batch_stats(T, 0, return_per_item_stats)
     end
 
     TVImageFiltering._validate(config)
@@ -1052,7 +1107,7 @@ function solve_batch!(
             primal_lower,
             primal_upper,
         )
-        return SolverStats{T}(0, true, zero(T))
+        return _zero_batch_stats(T, batch_count, return_per_item_stats)
     end
 
     spatial_ndims = N - 1
@@ -1160,10 +1215,13 @@ function solve_batch!(
 
             if active_count == 0
                 copyto!(u_batch, local_state.u)
-                return SolverStats{T}(
-                    maximum(iterations_per_slice),
+                return _batch_stats_result(
+                    T,
+                    iterations_per_slice,
+                    rel_changes,
+                    done_host,
                     true,
-                    maximum(rel_changes),
+                    return_per_item_stats,
                 )
             end
 
@@ -1175,7 +1233,14 @@ function solve_batch!(
     end
 
     copyto!(u_batch, local_state.u)
-    return SolverStats{T}(maximum(iterations_per_slice), false, maximum(rel_changes))
+    return _batch_stats_result(
+        T,
+        iterations_per_slice,
+        rel_changes,
+        done_host,
+        false,
+        return_per_item_stats,
+    )
 end
 
 end # module

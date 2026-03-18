@@ -24,6 +24,11 @@ Solve a batch of same-size images stored in one array.
 
 The last axis is interpreted as batch index, and TV operators act only on the
 leading spatial axes.
+
+Return values:
+- Default (`return_per_item_stats = false`): `(u_batch, summary_stats)`.
+- With `return_per_item_stats = true`: `(u_batch, summary_stats, per_item_stats)`,
+  where `per_item_stats` is a `Vector{SolverStats}` for each batch item.
 """
 function solve_batch(
     f_batch::AbstractArray{T,N},
@@ -36,6 +41,7 @@ function solve_batch(
     constraint::AbstractPrimalConstraint = NoConstraint(),
     init::Union{Nothing,AbstractArray} = nothing,
     state = nothing,
+    return_per_item_stats::Bool = false,
 ) where {T<:AbstractFloat,N}
     N >= 2 ||
         throw(ArgumentError("f_batch must have at least 2 dimensions (spatial..., batch)"))
@@ -54,7 +60,12 @@ function solve_batch(
         boundary = boundary,
         constraint = constraint,
         state = state,
+        return_per_item_stats = return_per_item_stats,
     )
+    if return_per_item_stats
+        summary_stats, per_item_stats = stats
+        return u_batch, summary_stats, per_item_stats
+    end
     return u_batch, stats
 end
 
@@ -78,6 +89,7 @@ function solve_batch!(
     boundary::AbstractBoundaryCondition = Neumann(),
     constraint::AbstractPrimalConstraint = NoConstraint(),
     state = nothing,
+    return_per_item_stats::Bool = false,
 ) where {T<:AbstractFloat,N}
     N >= 2 ||
         throw(ArgumentError("f_batch must have at least 2 dimensions (spatial..., batch)"))
@@ -104,6 +116,8 @@ function solve_batch!(
     max_iterations = 0
     converged = true
     max_rel_change = zero(T)
+    per_item_stats =
+        return_per_item_stats ? Vector{SolverStats{T}}(undef, batch_count) : nothing
 
     @views for b = 1:batch_count
         f_view = selectdim(f_batch, N, b)
@@ -125,9 +139,16 @@ function solve_batch!(
         max_iterations = max(max_iterations, stats.iterations)
         converged &= stats.converged
         max_rel_change = max(max_rel_change, stats.rel_change)
+        if return_per_item_stats
+            per_item_stats[b] = stats
+        end
     end
 
-    return SolverStats{T}(max_iterations, converged, max_rel_change)
+    summary_stats = SolverStats{T}(max_iterations, converged, max_rel_change)
+    if return_per_item_stats
+        return summary_stats, per_item_stats
+    end
+    return summary_stats
 end
 
 function solve_batch!(
@@ -141,6 +162,7 @@ function solve_batch!(
     boundary::AbstractBoundaryCondition = Neumann(),
     constraint::AbstractPrimalConstraint = NoConstraint(),
     state = nothing,
+    return_per_item_stats::Bool = false,
 ) where {T<:AbstractFloat,N}
     N >= 2 ||
         throw(ArgumentError("f_batch must have at least 2 dimensions (spatial..., batch)"))
@@ -162,6 +184,8 @@ function solve_batch!(
     max_iterations = 0
     converged = true
     max_rel_change = zero(T)
+    per_item_stats =
+        return_per_item_stats ? Vector{SolverStats{T}}(undef, batch_count) : nothing
 
     @views for b = 1:batch_count
         f_view = selectdim(f_batch, N, b)
@@ -183,7 +207,14 @@ function solve_batch!(
         max_iterations = max(max_iterations, stats.iterations)
         converged &= stats.converged
         max_rel_change = max(max_rel_change, stats.rel_change)
+        if return_per_item_stats
+            per_item_stats[b] = stats
+        end
     end
 
-    return SolverStats{T}(max_iterations, converged, max_rel_change)
+    summary_stats = SolverStats{T}(max_iterations, converged, max_rel_change)
+    if return_per_item_stats
+        return summary_stats, per_item_stats
+    end
+    return summary_stats
 end
