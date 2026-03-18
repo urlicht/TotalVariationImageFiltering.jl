@@ -2,6 +2,10 @@
 
 `TVImageFiltering.jl` is a Julia package for total-variation (TV) image denoising and reconstruction.
 
+![comparison: original, noisy, denoised](docs/img/demo1.png)
+![x slice showing a comparison: original, noisy, denoised](docs/img/demo2.png)
+
+
 It currently implements the ROF model with Chambolle's dual projection method:
 
 ```math
