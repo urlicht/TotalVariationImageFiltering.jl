@@ -45,5 +45,16 @@ using TVImageFiltering
 
         @test stats_gpu.iterations <= config.maxiter
         @test isapprox(Array(u_gpu), u_cpu; rtol = 5.0f-4, atol = 5.0f-4)
+
+        f_batch_cpu = rand(Float32, 48, 48, 3)
+        u_batch_cpu, stats_batch_cpu =
+            TVImageFiltering.solve_batch(f_batch_cpu, config; lambda = 0.15f0)
+        f_batch_gpu = CUDA.cu(f_batch_cpu)
+        u_batch_gpu, stats_batch_gpu =
+            TVImageFiltering.solve_batch(f_batch_gpu, config; lambda = 0.15f0)
+
+        @test stats_batch_cpu.iterations <= config.maxiter
+        @test stats_batch_gpu.iterations <= config.maxiter
+        @test isapprox(Array(u_batch_gpu), u_batch_cpu; rtol = 7.0f-4, atol = 7.0f-4)
     end
 end
