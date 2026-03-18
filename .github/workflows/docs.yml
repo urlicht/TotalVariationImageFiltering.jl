@@ -1,0 +1,37 @@
+name: Docs
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: read
+  statuses: write
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Julia
+        uses: julia-actions/setup-julia@v2
+        with:
+          version: "1.12"
+
+      - name: Cache Julia artifacts
+        uses: julia-actions/cache@v2
+
+      - name: Install docs dependencies
+        run: julia --color=yes --project=docs -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
+
+      - name: Build and deploy docs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: julia --color=yes --project=docs docs/make.jl
