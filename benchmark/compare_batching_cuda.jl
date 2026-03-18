@@ -109,9 +109,9 @@ Options:
     cfg[:samples] > 0 || error("samples must be positive")
     cfg[:evals] > 0 || error("evals must be positive")
     cfg[:maxiter] > 0 || error("maxiter must be positive")
-    cfg[:lambda] > 0f0 || error("lambda must be positive")
-    cfg[:tau] > 0f0 || error("tau must be positive")
-    cfg[:noise_sigma] >= 0f0 || error("noise must be non-negative")
+    cfg[:lambda] > 0.0f0 || error("lambda must be positive")
+    cfg[:tau] > 0.0f0 || error("tau must be positive")
+    cfg[:noise_sigma] >= 0.0f0 || error("noise must be non-negative")
 
     return BatchBenchConfig(
         cfg[:samples],
@@ -131,7 +131,8 @@ function require_cuda!()
     isdefined(@__MODULE__, :CUDA) || error(
         "CUDA.jl is not available in this environment. Run: julia --project=benchmark -e 'using Pkg; Pkg.add(\"CUDA\")'",
     )
-    CUDA.functional() || error("CUDA is installed but no functional CUDA device is available.")
+    CUDA.functional() ||
+        error("CUDA is installed but no functional CUDA device is available.")
     Base.get_extension(TVImageFiltering, :TVImageFilteringCUDAExt) === nothing && error(
         "TVImageFilteringCUDAExt is not active. Ensure CUDA is loaded before TVImageFiltering.",
     )
@@ -146,7 +147,7 @@ function normalize01!(data::AbstractArray{Float32})
             data[i] = (data[i] - lo) * scale
         end
     else
-        fill!(data, 0f0)
+        fill!(data, 0.0f0)
     end
     return data
 end
@@ -166,15 +167,11 @@ function load_base_image(image_size::Tuple{Int,Int})
     return resize_nearest(img, image_size[1], image_size[2])
 end
 
-function add_gaussian_noise(
-    clean::AbstractArray{Float32};
-    seed::Int,
-    sigma::Float32,
-)
+function add_gaussian_noise(clean::AbstractArray{Float32}; seed::Int, sigma::Float32)
     rng = MersenneTwister(seed)
     noisy = copy(clean)
     @inbounds for i in eachindex(noisy)
-        noisy[i] = clamp(noisy[i] + sigma * randn(rng, Float32), 0f0, 1f0)
+        noisy[i] = clamp(noisy[i] + sigma * randn(rng, Float32), 0.0f0, 1.0f0)
     end
     return noisy
 end
@@ -206,12 +203,7 @@ function run_no_batch!(
     return nothing
 end
 
-function run_batched!(
-    output,
-    problem,
-    solver_cfg::TVImageFiltering.ROFConfig,
-    state,
-)
+function run_batched!(output, problem, solver_cfg::TVImageFiltering.ROFConfig, state)
     copyto!(output, problem.f)
     TVImageFiltering.solve!(output, problem, solver_cfg; state = state)
     return nothing
@@ -303,11 +295,20 @@ function main()
     )
 
     for batch_size in cfg.batch_sizes
-        cpu_images = make_batch_inputs(clean, batch_size, cfg.seed + 10_000 * batch_size, cfg.noise_sigma)
+        cpu_images = make_batch_inputs(
+            clean,
+            batch_size,
+            cfg.seed + 10_000 * batch_size,
+            cfg.noise_sigma,
+        )
         gpu_images = [CUDA.CuArray(img) for img in cpu_images]
 
         problems = [
-            TVImageFiltering.TVProblem(img; lambda = cfg.lambda, tv_mode = TVImageFiltering.IsotropicTV()) for img in gpu_images
+            TVImageFiltering.TVProblem(
+                img;
+                lambda = cfg.lambda,
+                tv_mode = TVImageFiltering.IsotropicTV(),
+            ) for img in gpu_images
         ]
         outputs = [similar(img) for img in gpu_images]
         states = [TVImageFiltering.ROFState(img) for img in gpu_images]
@@ -318,7 +319,7 @@ function main()
         batch_problem = TVImageFiltering.TVProblem(
             stack_gpu;
             lambda = cfg.lambda,
-            spacing = (1f0, 1f0, 1.0f6),
+            spacing = (1.0f0, 1.0f0, 1.0f6),
             tv_mode = TVImageFiltering.IsotropicTV(),
         )
         batch_output = similar(stack_gpu)

@@ -24,20 +24,13 @@ const DEFAULT_THREADS = 256
     return DEFAULT_THREADS, cld(len, DEFAULT_THREADS)
 end
 
-function _gradient_dim_kernel!(
-    gd,
-    u,
-    scale,
-    stride_d::Int,
-    n_d::Int,
-    len::Int,
-)
+function _gradient_dim_kernel!(gd, u, scale, stride_d::Int, n_d::Int, len::Int)
     index = (blockIdx().x - 1) * blockDim().x + threadIdx().x
     if index <= len
         i = Int(index)
         coord_d = ((i - 1) ÷ stride_d) % n_d + 1
         @inbounds if coord_d < n_d
-            gd[i] = scale * (u[i + stride_d] - u[i])
+            gd[i] = scale * (u[i+stride_d] - u[i])
         else
             gd[i] = zero(scale)
         end
@@ -45,14 +38,7 @@ function _gradient_dim_kernel!(
     return nothing
 end
 
-function _divergence_dim_kernel!(
-    out,
-    pd,
-    scale,
-    stride_d::Int,
-    n_d::Int,
-    len::Int,
-)
+function _divergence_dim_kernel!(out, pd, scale, stride_d::Int, n_d::Int, len::Int)
     index = (blockIdx().x - 1) * blockDim().x + threadIdx().x
     if index <= len
         i = Int(index)
@@ -62,7 +48,7 @@ function _divergence_dim_kernel!(
             acc += scale * pd[i]
         end
         @inbounds if coord_d > 1
-            acc -= scale * pd[i - stride_d]
+            acc -= scale * pd[i-stride_d]
         end
         @inbounds out[i] += acc
     end
@@ -357,11 +343,7 @@ function solve_batch!(
             throw(ArgumentError("state dual buffers must match spatial dimensions"))
         state
     else
-        throw(
-            ArgumentError(
-                "state must be `nothing` or a compatible ROFBatchState object",
-            ),
-        )
+        throw(ArgumentError("state must be `nothing` or a compatible ROFBatchState object"))
     end
 
     copyto!(local_state.u, u_batch)

@@ -66,6 +66,11 @@ using TVImageFiltering
         @test stats_batch_cpu.iterations <= config.maxiter
         @test stats_batch_gpu.iterations <= config.maxiter
         @test isapprox(Array(u_batch_gpu), u_batch_cpu; rtol = 7.0f-4, atol = 7.0f-4)
-        @test isapprox(Array(u_batch_gpu), Array(u_sliced_gpu); rtol = 5.0f-5, atol = 5.0f-5)
+        @test isapprox(
+            Array(u_batch_gpu),
+            Array(u_sliced_gpu);
+            rtol = 5.0f-5,
+            atol = 5.0f-5,
+        )
     end
 end

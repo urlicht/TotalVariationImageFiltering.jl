@@ -37,7 +37,8 @@ function parse_args(args::Vector{String})
 
     for arg in args
         if arg == "--help" || arg == "-h"
-            println("""
+            println(
+                """
 Usage:
   julia --project=benchmark benchmark/run_benchmarks.jl [options]
 
@@ -52,7 +53,8 @@ Options:
 
 Backward-compatible aliases:
   --no-gpu                     Equivalent to --backend=cpu
-""")
+""",
+            )
             exit(0)
         elseif arg == "--quick"
             cfg[:quick] = true
@@ -167,7 +169,7 @@ function normalize01!(data::AbstractArray{Float32})
             data[i] = (data[i] - lo) * scale
         end
     else
-        fill!(data, 0f0)
+        fill!(data, 0.0f0)
     end
     return data
 end
@@ -188,18 +190,18 @@ function add_noise(
     noisy = copy(clean)
 
     @inbounds for i in eachindex(noisy)
-        noisy[i] = clamp(noisy[i] + gaussian_sigma * randn(rng, Float32), 0f0, 1f0)
+        noisy[i] = clamp(noisy[i] + gaussian_sigma * randn(rng, Float32), 0.0f0, 1.0f0)
     end
 
-    if salt_pepper_prob > 0f0
-        half = salt_pepper_prob / 2f0
-        upper = 1f0 - half
+    if salt_pepper_prob > 0.0f0
+        half = salt_pepper_prob / 2.0f0
+        upper = 1.0f0 - half
         @inbounds for i in eachindex(noisy)
             r = rand(rng, Float32)
             if r < half
-                noisy[i] = 0f0
+                noisy[i] = 0.0f0
             elseif r > upper
-                noisy[i] = 1f0
+                noisy[i] = 1.0f0
             end
         end
     end
@@ -239,8 +241,8 @@ function prepare_cases(cfg::BenchConfig)
         loaded = try
             load_case(case; quick = cfg.quick, seed = cfg.seed + i)
         catch err
-            @warn "Skipping benchmark case because image loading failed." case = case.name image =
-                case.image error = err
+            @warn "Skipping benchmark case because image loading failed." case =
+                case.name image = case.image error = err
             continue
         end
 
@@ -315,20 +317,10 @@ function run_cpu_benchmarks(cfg::BenchConfig, cases, rows)
 
         TVImageFiltering.solve(problem, solver_cfg)
         trial = run(
-            @benchmarkable TVImageFiltering.solve(
-                $problem,
-                $solver_cfg,
-            ) samples = cfg.samples evals = cfg.evals
+            @benchmarkable TVImageFiltering.solve($problem, $solver_cfg) samples =
+                cfg.samples evals = cfg.evals
         )
-        push_summary!(
-            rows,
-            "cpu",
-            "solve_allocating",
-            case.image,
-            dims,
-            cfg,
-            trial,
-        )
+        push_summary!(rows, "cpu", "solve_allocating", case.image, dims, cfg, trial)
 
         copyto!(u, case.noisy)
         TVImageFiltering.solve!(u, problem, solver_cfg; state = state)
@@ -338,15 +330,7 @@ function run_cpu_benchmarks(cfg::BenchConfig, cases, rows)
                 TVImageFiltering.solve!($u, $problem, $solver_cfg; state = $state)
             end samples = cfg.samples evals = cfg.evals
         )
-        push_summary!(
-            rows,
-            "cpu",
-            "solve_state_reuse",
-            case.image,
-            dims,
-            cfg,
-            trial,
-        )
+        push_summary!(rows, "cpu", "solve_state_reuse", case.image, dims, cfg, trial)
     end
 end
 
@@ -356,7 +340,8 @@ function maybe_load_cuda()
         @eval using CUDA
         cuda = Base.invokelatest(() -> getfield(@__MODULE__, :CUDA))
         Base.invokelatest(cuda.functional) || return nothing
-        Base.get_extension(TVImageFiltering, :TVImageFilteringCUDAExt) === nothing && return nothing
+        Base.get_extension(TVImageFiltering, :TVImageFilteringCUDAExt) === nothing &&
+            return nothing
         return cuda
     catch
         return nothing
@@ -366,7 +351,9 @@ end
 function run_cuda_benchmarks(cfg::BenchConfig, cases, rows)
     CUDA = maybe_load_cuda()
     if CUDA === nothing
-        println("Skipping CUDA benchmarks (CUDA not installed, extension inactive, or no functional CUDA device).")
+        println(
+            "Skipping CUDA benchmarks (CUDA not installed, extension inactive, or no functional CUDA device).",
+        )
         return
     end
 
@@ -382,11 +369,8 @@ function _run_cuda_benchmarks_loaded(CUDA, cfg::BenchConfig, cases, rows)
         dims = dims_string(size(case.noisy))
         noisy_gpu = CUDA.CuArray(case.noisy)
 
-        problem = TVImageFiltering.TVProblem(
-            noisy_gpu;
-            lambda = case.lambda,
-            tv_mode = case.mode,
-        )
+        problem =
+            TVImageFiltering.TVProblem(noisy_gpu; lambda = case.lambda, tv_mode = case.mode)
         solver_cfg = TVImageFiltering.ROFConfig(
             maxiter = maxiter,
             tau = 0.1f0,
@@ -405,15 +389,7 @@ function _run_cuda_benchmarks_loaded(CUDA, cfg::BenchConfig, cases, rows)
                 CUDA.synchronize()
             end samples = cfg.samples evals = cfg.evals
         )
-        push_summary!(
-            rows,
-            "cuda",
-            "solve_allocating",
-            case.image,
-            dims,
-            cfg,
-            trial,
-        )
+        push_summary!(rows, "cuda", "solve_allocating", case.image, dims, cfg, trial)
 
         copyto!(u_gpu, noisy_gpu)
         TVImageFiltering.solve!(u_gpu, problem, solver_cfg; state = state)
@@ -425,15 +401,7 @@ function _run_cuda_benchmarks_loaded(CUDA, cfg::BenchConfig, cases, rows)
                 CUDA.synchronize()
             end samples = cfg.samples evals = cfg.evals
         )
-        push_summary!(
-            rows,
-            "cuda",
-            "solve_state_reuse",
-            case.image,
-            dims,
-            cfg,
-            trial,
-        )
+        push_summary!(rows, "cuda", "solve_state_reuse", case.image, dims, cfg, trial)
     end
 end
 

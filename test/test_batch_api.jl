@@ -5,16 +5,29 @@ using TVImageFiltering
 @testset "solve_batch CPU API" begin
     Random.seed!(503)
     f_batch = randn(Float64, 16, 12, 4)
-    config = TVImageFiltering.ROFConfig(maxiter = 1500, tau = 0.0625, tol = 1e-8, check_every = 10)
+    config = TVImageFiltering.ROFConfig(
+        maxiter = 1500,
+        tau = 0.0625,
+        tol = 1e-8,
+        check_every = 10,
+    )
 
-    u_batch, stats_batch =
-        TVImageFiltering.solve_batch(f_batch, config; lambda = 0.2, tv_mode = TVImageFiltering.IsotropicTV())
+    u_batch, stats_batch = TVImageFiltering.solve_batch(
+        f_batch,
+        config;
+        lambda = 0.2,
+        tv_mode = TVImageFiltering.IsotropicTV(),
+    )
 
     expected = similar(f_batch)
     per_stats = TVImageFiltering.SolverStats{Float64}[]
     @views for b = 1:size(f_batch, 3)
         fb = selectdim(f_batch, 3, b)
-        prob = TVImageFiltering.TVProblem(fb; lambda = 0.2, tv_mode = TVImageFiltering.IsotropicTV())
+        prob = TVImageFiltering.TVProblem(
+            fb;
+            lambda = 0.2,
+            tv_mode = TVImageFiltering.IsotropicTV(),
+        )
         ub, st = TVImageFiltering.solve(prob, config)
         copyto!(selectdim(expected, 3, b), ub)
         push!(per_stats, st)
@@ -29,9 +42,15 @@ end
 @testset "solve_batch state reuse and error paths" begin
     Random.seed!(509)
     f_batch = randn(Float64, 8, 8, 3)
-    config = TVImageFiltering.ROFConfig(maxiter = 3000, tau = 0.0625, tol = 1e-9, check_every = 10)
+    config = TVImageFiltering.ROFConfig(
+        maxiter = 3000,
+        tau = 0.0625,
+        tol = 1e-9,
+        check_every = 10,
+    )
 
-    states = [TVImageFiltering.ROFState(selectdim(f_batch, 3, b)) for b = 1:size(f_batch, 3)]
+    states =
+        [TVImageFiltering.ROFState(selectdim(f_batch, 3, b)) for b = 1:size(f_batch, 3)]
     u1, st1 = TVImageFiltering.solve_batch(
         f_batch,
         config;

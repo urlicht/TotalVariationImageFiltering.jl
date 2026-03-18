@@ -85,15 +85,12 @@ function solve_batch!(
     local_states = if state === nothing
         nothing
     elseif state isa AbstractVector
-        length(state) == batch_count ||
-            throw(ArgumentError("state vector length must equal batch size $batch_count"))
+        length(state) == batch_count || throw(
+            ArgumentError("state vector length must equal batch size $batch_count"),
+        )
         state
     else
-        throw(
-            ArgumentError(
-                "state must be `nothing` or a vector of per-image state objects",
-            ),
-        )
+        throw(ArgumentError("state must be `nothing` or a vector of per-image state objects"))
     end
 
     max_iterations = 0
@@ -112,8 +109,9 @@ function solve_batch!(
             boundary = boundary,
         )
 
-        stats = local_states === nothing ? solve!(u_view, problem, config) :
-                solve!(u_view, problem, config; state = local_states[b])
+        stats =
+            local_states === nothing ? solve!(u_view, problem, config) :
+            solve!(u_view, problem, config; state = local_states[b])
 
         max_iterations = max(max_iterations, stats.iterations)
         converged &= stats.converged
