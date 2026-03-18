@@ -32,6 +32,10 @@ function divergence!(
     return out
 end
 
-function divergence!(out::AbstractArray{T,N}, p::NTuple{N,AT}, boundary::Neumann) where {T,N,AT}
+function divergence!(
+    out::AbstractArray{T,N},
+    p::NTuple{N,AT},
+    boundary::Neumann,
+) where {T,N,AT}
     return divergence!(out, p, boundary, ntuple(_ -> one(T), Val(N)))
 end

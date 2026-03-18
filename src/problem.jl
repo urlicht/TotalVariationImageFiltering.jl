@@ -20,7 +20,11 @@ struct TVProblem{
     boundary::BC
 end
 
-function _normalize_spacing(::Type{T}, ::Val{N}, spacing::Nothing) where {T<:AbstractFloat,N}
+function _normalize_spacing(
+    ::Type{T},
+    ::Val{N},
+    spacing::Nothing,
+) where {T<:AbstractFloat,N}
     return ntuple(_ -> one(T), Val(N))
 end
 
@@ -50,8 +54,9 @@ function _normalize_spacing(
     ::Val{N},
     spacing::AbstractVector{<:Real},
 ) where {T<:AbstractFloat,N}
-    length(spacing) == N ||
-        throw(ArgumentError("spacing length must match ndims(f)=$N, got $(length(spacing))"))
+    length(spacing) == N || throw(
+        ArgumentError("spacing length must match ndims(f)=$N, got $(length(spacing))"),
+    )
     scales = ntuple(d -> T(spacing[d]), Val(N))
     @inbounds for d = 1:N
         isfinite(scales[d]) || throw(ArgumentError("spacing[$d] must be finite"))

@@ -85,7 +85,10 @@ function _rof_dual_step!(
     return nothing
 end
 
-function _tau_upper_bound(inv_spacing::NTuple{N,T}, shape::NTuple{N,Int}) where {N,T<:AbstractFloat}
+function _tau_upper_bound(
+    inv_spacing::NTuple{N,T},
+    shape::NTuple{N,Int},
+) where {N,T<:AbstractFloat}
     lipschitz_term = zero(T)
     @inbounds for d = 1:N
         if shape[d] > 1
