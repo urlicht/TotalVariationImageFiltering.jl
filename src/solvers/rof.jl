@@ -166,7 +166,8 @@ Constraint support:
 
 State and buffer reuse:
 - Reuse `u` and `state` across calls to avoid allocations.
-- `u` is copied into solver state and acts as primal warm start.
+- `u` is copied into solver state as the initial output buffer.
+- For ROF iterations, the effective warm start is the retained dual variable `state.p`.
 - `state.p` is reused as dual warm start and is not reset by `solve!`.
 - For new image data with the same array storage, update in place with
   `copyto!(problem.f, new_f)` and call `solve!` again.

@@ -70,7 +70,9 @@ stats = TVImageFiltering.solve!(u, problem, TVImageFiltering.ROFConfig(); state 
 
 Behavior:
 
-- `u` provides primal warm start.
+- For `PDHGConfig`, `u` provides primal warm start.
+- For `ROFConfig`, `state.p` is the effective warm start; `u` is copied into the
+  solver buffer and mainly affects the first relative-change check.
 - `state.p` (dual variable) is retained across calls.
 - State shape/eltype must match the solve buffer.
 
