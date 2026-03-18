@@ -6,6 +6,8 @@
 `TVImageFiltering.jl` is a Julia package for total-variation (TV) denoising and
 reconstruction on `N`-dimensional arrays.
 
+Original implementation: [GPUFilter.jl](https://github.com/flavell-lab/GPUFilter.jl)
+
 ![comparison: original, noisy, denoised](docs/img/demo1.png)
 ![x slice showing a comparison: original, noisy, denoised](docs/img/demo2.png)
 
