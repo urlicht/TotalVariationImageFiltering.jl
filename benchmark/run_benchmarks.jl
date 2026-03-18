@@ -145,7 +145,7 @@ function benchmark_cases(; quick::Bool)
             lambda = 0.10f0,
             gaussian_sigma = 0.02f0,
             salt_pepper_prob = 0.00f0,
-            gpu = false,
+            gpu = true,
         ),
         (
             name = "resolution_test_1920-large",
@@ -154,7 +154,7 @@ function benchmark_cases(; quick::Bool)
             lambda = 0.10f0,
             gaussian_sigma = 0.02f0,
             salt_pepper_prob = 0.00f0,
-            gpu = false,
+            gpu = true,
         ),
     ]
 end
@@ -376,7 +376,7 @@ end
 
 function _run_cuda_benchmarks_loaded(CUDA, cfg::BenchConfig, cases, rows)
     maxiter = cfg.quick ? 120 : 240
-    gpu_cases = filter(case -> ndims(case.noisy) == 2 && case.gpu, cases)
+    gpu_cases = filter(case -> case.gpu, cases)
 
     for case in gpu_cases
         dims = dims_string(size(case.noisy))
