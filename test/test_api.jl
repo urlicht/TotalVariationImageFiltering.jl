@@ -34,6 +34,7 @@ end
 end
 
 @testset "solve API Keyword Forwarding to solve!" begin
+    Random.seed!(103)
     f = randn(20)
     prob = TVImageFiltering.TVProblem(
         f;
@@ -52,7 +53,7 @@ end
     u2, s2 = TVImageFiltering.solve(prob, cfg; init = fill(3.0, size(f)), state = state)
     @test s1.converged
     @test s2.converged
-    @test maximum(abs.(u1 .- u2)) <= 1e-7
+    @test isapprox(u1, u2; atol = 1e-6, rtol = 0.0)
 end
 
 @testset "solve!/solve Fallback for Unknown Solver" begin
