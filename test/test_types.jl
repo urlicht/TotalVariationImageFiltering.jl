@@ -4,15 +4,61 @@ using TVImageFiltering
 @testset "Type Hierarchy" begin
     @test TVImageFiltering.Neumann <: TVImageFiltering.AbstractBoundaryCondition
     @test TVImageFiltering.L2Fidelity <: TVImageFiltering.AbstractDataFidelity
+    @test TVImageFiltering.PoissonFidelity <: TVImageFiltering.AbstractDataFidelity
     @test TVImageFiltering.IsotropicTV <: TVImageFiltering.AbstractTVMode
     @test TVImageFiltering.AnisotropicTV <: TVImageFiltering.AbstractTVMode
     @test TVImageFiltering.ROFConfig <: TVImageFiltering.AbstractTVSolver
+    @test TVImageFiltering.PDHGConfig <: TVImageFiltering.AbstractTVSolver
 end
 
 @testset "Common Config Validation" begin
     @test TVImageFiltering._validate_common_config(1, 1) === nothing
     @test_throws ArgumentError TVImageFiltering._validate_common_config(0, 1)
     @test_throws ArgumentError TVImageFiltering._validate_common_config(1, 0)
+end
+
+@testset "PDHGConfig Constructor and Validation" begin
+    cfg_default = TVImageFiltering.PDHGConfig()
+    @test cfg_default.maxiter == 500
+    @test cfg_default.tau == 0.25
+    @test cfg_default.sigma == 0.25
+    @test cfg_default.theta == 1.0
+    @test cfg_default.tol == 1e-4
+    @test cfg_default.check_every == 10
+    @test TVImageFiltering._validate(cfg_default) === nothing
+
+    cfg_promoted = TVImageFiltering.PDHGConfig(tau = Float32(0.2), sigma = 0.1, tol = 1e-6)
+    @test cfg_promoted isa TVImageFiltering.PDHGConfig{Float64}
+
+    cfg_float32 = TVImageFiltering.PDHGConfig(
+        tau = Float32(0.2),
+        sigma = Float32(0.1),
+        theta = Float32(1),
+        tol = Float32(1e-3),
+    )
+    @test cfg_float32 isa TVImageFiltering.PDHGConfig{Float32}
+
+    @test_throws ArgumentError TVImageFiltering._validate(
+        TVImageFiltering.PDHGConfig(maxiter = 0),
+    )
+    @test_throws ArgumentError TVImageFiltering._validate(
+        TVImageFiltering.PDHGConfig(check_every = 0),
+    )
+    @test_throws ArgumentError TVImageFiltering._validate(
+        TVImageFiltering.PDHGConfig(tau = 0.0),
+    )
+    @test_throws ArgumentError TVImageFiltering._validate(
+        TVImageFiltering.PDHGConfig(sigma = 0.0),
+    )
+    @test_throws ArgumentError TVImageFiltering._validate(
+        TVImageFiltering.PDHGConfig(theta = -0.1),
+    )
+    @test_throws ArgumentError TVImageFiltering._validate(
+        TVImageFiltering.PDHGConfig(theta = 1.1),
+    )
+    @test_throws ArgumentError TVImageFiltering._validate(
+        TVImageFiltering.PDHGConfig(tol = -1e-6),
+    )
 end
 
 @testset "SolverStats Shape" begin

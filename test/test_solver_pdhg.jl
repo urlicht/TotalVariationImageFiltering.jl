@@ -1,0 +1,324 @@
+using Test
+using Random
+using Statistics
+using TVImageFiltering
+
+struct DummyFidelityForPDHG <: TVImageFiltering.AbstractDataFidelity end
+
+function tv_seminorm(
+    u::AbstractArray{T,N},
+    spacing::NTuple{N,T},
+    tv_mode::TVImageFiltering.AbstractTVMode,
+) where {T<:AbstractFloat,N}
+    g = TVImageFiltering.allocate_dual(u)
+    inv_spacing = ntuple(d -> inv(spacing[d]), Val(N))
+    TVImageFiltering.gradient!(g, u, TVImageFiltering.Neumann(), inv_spacing)
+
+    total = zero(T)
+    if tv_mode isa TVImageFiltering.IsotropicTV
+        @inbounds for i in eachindex(g[1])
+            nrm2 = zero(T)
+            for d = 1:N
+                nrm2 = muladd(g[d][i], g[d][i], nrm2)
+            end
+            total += sqrt(nrm2)
+        end
+    else
+        @inbounds for d = 1:N
+            total += sum(abs, g[d])
+        end
+    end
+
+    return total
+end
+
+function poisson_data_term(
+    u::AbstractArray{T},
+    f::AbstractArray{T},
+) where {T<:AbstractFloat}
+    total = zero(T)
+    @inbounds for i in eachindex(u, f)
+        ui = u[i]
+        fi = f[i]
+        if fi == zero(T)
+            total += ui
+        else
+            ui > zero(T) || return T(Inf)
+            total += ui - fi * log(ui)
+        end
+    end
+    return total
+end
+
+function rand_poisson_knuth(rng::AbstractRNG, λ::T) where {T<:AbstractFloat}
+    λ <= zero(T) && return 0
+    limit = exp(-λ)
+    product = one(T)
+    k = 0
+    while product > limit
+        k += 1
+        product *= rand(rng, T)
+    end
+    return k - 1
+end
+
+function sample_poisson_normalized(
+    rng::AbstractRNG,
+    clean::AbstractArray{T},
+    scale::T,
+) where {T<:AbstractFloat}
+    scale > zero(T) || throw(ArgumentError("scale must be positive"))
+    noisy = similar(clean)
+    @inbounds for i in eachindex(clean)
+        λ = scale * clean[i]
+        noisy[i] = T(rand_poisson_knuth(rng, λ)) / scale
+    end
+    return noisy
+end
+
+@testset "PDHG Internal Helpers" begin
+    @test TVImageFiltering._pdhg_operator_norm_sq_upper_bound((1.0, 2.0, 3.0), (8, 1, 5)) ==
+          40.0
+    @test TVImageFiltering._pdhg_operator_norm_sq_upper_bound((1.0, 2.0), (1, 1)) == 0.0
+end
+
+@testset "PDHG L2 Matches ROF" begin
+    Random.seed!(71)
+    f = randn(32, 24)
+    prob = TVImageFiltering.TVProblem(
+        f;
+        lambda = 0.18,
+        spacing = (1.0, 0.75),
+        tv_mode = TVImageFiltering.IsotropicTV(),
+    )
+
+    rof_cfg = TVImageFiltering.ROFConfig(
+        maxiter = 5000,
+        tau = 0.05,
+        tol = 1e-8,
+        check_every = 20,
+    )
+    pdhg_cfg = TVImageFiltering.PDHGConfig(
+        maxiter = 8000,
+        tau = 0.12,
+        sigma = 0.08,
+        theta = 1.0,
+        tol = 1e-8,
+        check_every = 20,
+    )
+
+    u_rof, stats_rof = TVImageFiltering.solve(prob, rof_cfg)
+    u_pdhg, stats_pdhg = TVImageFiltering.solve(prob, pdhg_cfg)
+
+    @test stats_rof.converged
+    @test stats_pdhg.converged
+    @test maximum(abs.(u_pdhg .- u_rof)) <= 1e-2
+end
+
+@testset "PDHG Poisson Fidelity" begin
+    Random.seed!(73)
+    f = rand(Float64, 28, 20) .* 2 .+ 0.2
+    mode = TVImageFiltering.AnisotropicTV()
+
+    prob = TVImageFiltering.TVProblem(
+        f;
+        lambda = 0.12,
+        data_fidelity = TVImageFiltering.PoissonFidelity(),
+        tv_mode = mode,
+    )
+    cfg = TVImageFiltering.PDHGConfig(
+        maxiter = 4000,
+        tau = 0.1,
+        sigma = 0.1,
+        theta = 1.0,
+        tol = 1e-7,
+        check_every = 20,
+    )
+
+    u, stats = TVImageFiltering.solve(prob, cfg)
+    obj_initial = poisson_data_term(f, f) + prob.lambda * tv_seminorm(f, prob.spacing, mode)
+    obj_final = poisson_data_term(u, f) + prob.lambda * tv_seminorm(u, prob.spacing, mode)
+
+    @test stats.converged
+    @test minimum(u) >= -1e-10
+    @test obj_final <= obj_initial + 1e-4
+
+    prob_lambda0 =
+        TVImageFiltering.TVProblem(f; lambda = 0.0, data_fidelity = TVImageFiltering.PoissonFidelity())
+    u0, stats0 = TVImageFiltering.solve(prob_lambda0, cfg; init = fill(7.0, size(f)))
+    @test u0 == f
+    @test stats0.iterations == 0
+    @test stats0.converged
+    @test stats0.rel_change == 0.0
+end
+
+@testset "PDHG State Reuse and Error Paths" begin
+    f = randn(24)
+    prob = TVImageFiltering.TVProblem(
+        f;
+        lambda = 0.2,
+        tv_mode = TVImageFiltering.IsotropicTV(),
+    )
+    @test_throws ArgumentError TVImageFiltering.solve(
+        prob,
+        TVImageFiltering.PDHGConfig(
+            maxiter = 20,
+            tau = 0.6,
+            sigma = 0.6,
+            tol = 0.0,
+            check_every = 1,
+        ),
+    )
+
+    cfg = TVImageFiltering.PDHGConfig(
+        maxiter = 3000,
+        tau = 0.2,
+        sigma = 0.2,
+        theta = 1.0,
+        tol = 1e-8,
+        check_every = 20,
+    )
+    state = TVImageFiltering.PDHGState(f)
+    u1, s1 = TVImageFiltering.solve(prob, cfg; state = state)
+    u2, s2 = TVImageFiltering.solve(prob, cfg; init = fill(3.0, size(f)), state = state)
+    @test s1.converged
+    @test s2.converged
+    @test maximum(abs.(u1 .- u2)) <= 1e-5
+
+    bad_poisson_prob = TVImageFiltering.TVProblem(
+        [-0.1, 0.2];
+        lambda = 0.1,
+        data_fidelity = TVImageFiltering.PoissonFidelity(),
+    )
+    @test_throws ArgumentError TVImageFiltering.solve(bad_poisson_prob, cfg)
+
+    bad_fidelity_prob =
+        TVImageFiltering.TVProblem(f; lambda = 0.2, data_fidelity = DummyFidelityForPDHG())
+    @test_throws ArgumentError TVImageFiltering.solve(bad_fidelity_prob, cfg)
+end
+
+@testset "PDHG Batch API" begin
+    Random.seed!(79)
+    f_batch = randn(Float64, 12, 10, 4)
+    config = TVImageFiltering.PDHGConfig(
+        maxiter = 2500,
+        tau = 0.2,
+        sigma = 0.2,
+        theta = 1.0,
+        tol = 1e-7,
+        check_every = 10,
+    )
+
+    u_batch, stats_batch = TVImageFiltering.solve_batch(
+        f_batch,
+        config;
+        lambda = 0.15,
+        tv_mode = TVImageFiltering.IsotropicTV(),
+    )
+
+    expected = similar(f_batch)
+    per_stats = TVImageFiltering.SolverStats{Float64}[]
+    @views for b = 1:size(f_batch, 3)
+        fb = selectdim(f_batch, 3, b)
+        prob = TVImageFiltering.TVProblem(
+            fb;
+            lambda = 0.15,
+            tv_mode = TVImageFiltering.IsotropicTV(),
+        )
+        ub, st = TVImageFiltering.solve(prob, config)
+        copyto!(selectdim(expected, 3, b), ub)
+        push!(per_stats, st)
+    end
+
+    @test isapprox(u_batch, expected; rtol = 0.0, atol = 1e-8)
+    @test stats_batch.iterations == maximum(st.iterations for st in per_stats)
+    @test stats_batch.converged == all(st.converged for st in per_stats)
+    @test stats_batch.rel_change == maximum(st.rel_change for st in per_stats)
+
+    states = [TVImageFiltering.PDHGState(selectdim(f_batch, 3, b)) for b = 1:size(f_batch, 3)]
+    u1, st1 = TVImageFiltering.solve_batch(
+        f_batch,
+        config;
+        lambda = 0.15,
+        tv_mode = TVImageFiltering.AnisotropicTV(),
+        state = states,
+    )
+    u2, st2 = TVImageFiltering.solve_batch(
+        f_batch,
+        config;
+        lambda = 0.15,
+        tv_mode = TVImageFiltering.AnisotropicTV(),
+        state = states,
+        init = fill(3.0, size(f_batch)),
+    )
+    @test st1.converged
+    @test st2.converged
+    @test maximum(abs.(u1 .- u2)) <= 1e-5
+
+    @test_throws ArgumentError TVImageFiltering.solve_batch(randn(8), config; lambda = 0.1)
+    @test_throws ArgumentError TVImageFiltering.solve_batch(
+        f_batch,
+        config;
+        lambda = 0.1,
+        init = zeros(12, 10, 3),
+    )
+    @test_throws ArgumentError TVImageFiltering.solve_batch(
+        f_batch,
+        config;
+        lambda = 0.1,
+        state = states[1:2],
+    )
+end
+
+@testset "PDHG Poisson-vs-L2 on Simulated Poisson Noise" begin
+    rng = MersenneTwister(97)
+    clean = fill(0.15, 40, 40)
+    clean[9:32, 9:32] .= 0.8
+    clean[17:24, 17:24] .= 1.8
+
+    # Low-photon regime where Poisson modeling should be beneficial.
+    scale = 8.0
+    noisy = sample_poisson_normalized(rng, clean, scale)
+
+    lambda = 0.12
+    mode = TVImageFiltering.IsotropicTV()
+    cfg = TVImageFiltering.PDHGConfig(
+        maxiter = 6000,
+        tau = 0.15,
+        sigma = 0.15,
+        theta = 1.0,
+        tol = 1e-7,
+        check_every = 20,
+    )
+
+    prob_poisson = TVImageFiltering.TVProblem(
+        noisy;
+        lambda = lambda,
+        data_fidelity = TVImageFiltering.PoissonFidelity(),
+        tv_mode = mode,
+    )
+    prob_l2 = TVImageFiltering.TVProblem(
+        noisy;
+        lambda = lambda,
+        data_fidelity = TVImageFiltering.L2Fidelity(),
+        tv_mode = mode,
+    )
+
+    u_poisson, st_poisson = TVImageFiltering.solve(prob_poisson, cfg)
+    u_l2, st_l2 = TVImageFiltering.solve(prob_l2, cfg)
+
+    obj_poisson = poisson_data_term(u_poisson, noisy) +
+                  lambda * tv_seminorm(u_poisson, prob_poisson.spacing, mode)
+    obj_l2_in_poisson_metric = poisson_data_term(u_l2, noisy) +
+                               lambda * tv_seminorm(u_l2, prob_l2.spacing, mode)
+    mse_poisson = mean(abs2, u_poisson .- clean)
+    mse_l2 = mean(abs2, u_l2 .- clean)
+
+    @test st_poisson.converged
+    @test st_l2.converged
+    @test minimum(u_poisson) >= -1e-10
+    @test obj_poisson <= obj_l2_in_poisson_metric + 1e-4
+    @test isfinite(mse_poisson)
+    @test isfinite(mse_l2)
+    @test abs(mse_poisson - mse_l2) >= 1e-6
+end
