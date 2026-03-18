@@ -1,3 +1,31 @@
+"""
+Configuration for the ROF dual-projection solver.
+
+This solver targets the Rudin-Osher-Fatemi denoising model with `L2Fidelity`:
+
+    minimize_u 0.5 * ||u - f||_2^2 + lambda * TV(u)
+
+`tau` is the dual ascent step and must satisfy the stability bound used by this
+implementation:
+
+    tau < 1 / (2 * sum_{d: n_d > 1} h_d^(-2))
+
+where `h_d = spacing[d]` and `n_d = size(f, d)`.
+
+Fields:
+- `maxiter`: maximum number of iterations.
+- `tau`: dual step size.
+- `tol`: stopping tolerance on relative primal change.
+- `check_every`: evaluate convergence every `check_every` iterations.
+
+References:
+- L. I. Rudin, S. Osher, E. Fatemi, "Nonlinear total variation based noise
+  removal algorithms," *Physica D* 60(1-4):259-268, 1992.
+  DOI: 10.1016/0167-2789(92)90242-F
+- A. Chambolle, "An algorithm for total variation minimization and
+  applications," *Journal of Mathematical Imaging and Vision* 20:89-97, 2004.
+  DOI: 10.1023/B:JMIV.0000011325.36760.1E
+"""
 struct ROFConfig{T<:AbstractFloat} <: AbstractTVSolver
     maxiter::Int
     tau::T
@@ -7,7 +35,7 @@ end
 
 function ROFConfig(;
     maxiter::Int = 300,
-    tau::Real = 0.0625, # τ = 0.25 max for 2D, see 2nd remark after proof of Theorem 3.1.
+    tau::Real = 0.0625, # Conservative default; for 2D unit spacing, Chambolle (2004) gives tau < 0.25.
     tol::Real = 1e-4,
     check_every::Int = 10,
 )
@@ -104,6 +132,30 @@ end
 Run ROF denoising in place.
 
 `u` is both the initial guess and output buffer.
+
+The implementation follows Chambolle's dual projection method for the ROF model.
+With dual variable `p` and image `f`, each iteration computes:
+
+    g^k = div(p^k) - f / lambda
+
+    p^(k+1) = Proj_B(p^k + tau * grad(g^k))
+
+    u^(k+1) = f - lambda * div(p^(k+1))
+
+where `Proj_B` is projection onto the TV dual unit ball:
+- isotropic TV: `||p[i]||_2 <= 1` per pixel/voxel,
+- anisotropic TV: `|p[d][i]| <= 1` per component.
+
+`gradient!` and `divergence!` use forward/backward finite differences with
+homogeneous Neumann boundary handling and account for `problem.spacing`.
+
+References:
+- L. I. Rudin, S. Osher, E. Fatemi, "Nonlinear total variation based noise
+  removal algorithms," *Physica D* 60(1-4):259-268, 1992.
+  DOI: 10.1016/0167-2789(92)90242-F
+- A. Chambolle, "An algorithm for total variation minimization and
+  applications," *Journal of Mathematical Imaging and Vision* 20:89-97, 2004.
+  DOI: 10.1023/B:JMIV.0000011325.36760.1E
 """
 function solve!(
     u::AbstractArray{T,N},
