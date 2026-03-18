@@ -28,4 +28,4 @@ docs/site/
 Manifest.toml
 
 # Benchmark outputs
-results/
+benchmark/results/
