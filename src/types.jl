@@ -32,6 +32,48 @@ Poisson negative log-likelihood fidelity, `sum(u - f * log(u))` up to constants.
 struct PoissonFidelity <: AbstractDataFidelity end
 
 #
+# Primal constraints
+#
+
+"""
+Abstract supertype for pointwise convex constraints on the primal variable `u`.
+"""
+abstract type AbstractPrimalConstraint end
+
+"""
+No additional primal constraint.
+"""
+struct NoConstraint <: AbstractPrimalConstraint end
+
+"""
+Pointwise non-negativity constraint, `u[i] >= 0`.
+"""
+struct NonnegativeConstraint <: AbstractPrimalConstraint end
+
+"""
+Pointwise box constraint, `lower <= u[i] <= upper`.
+"""
+struct BoxConstraint{T<:AbstractFloat} <: AbstractPrimalConstraint
+    lower::T
+    upper::T
+    function BoxConstraint{T}(lower::T, upper::T) where {T<:AbstractFloat}
+        isnan(lower) && throw(ArgumentError("lower must not be NaN"))
+        isnan(upper) && throw(ArgumentError("upper must not be NaN"))
+        lower <= upper || throw(
+            ArgumentError("lower must be <= upper, got lower=$(lower), upper=$(upper)"),
+        )
+        return new{T}(lower, upper)
+    end
+end
+
+function BoxConstraint(lower::Real, upper::Real)
+    T = promote_type(typeof(float(lower)), typeof(float(upper)))
+    lower_t = T(lower)
+    upper_t = T(upper)
+    return BoxConstraint{T}(lower_t, upper_t)
+end
+
+#
 # TVMode (pixel/voxel) isotropy
 #
 
