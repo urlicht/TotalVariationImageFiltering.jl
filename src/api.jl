@@ -1,7 +1,7 @@
 """
 Solve a TV problem and return `(u, stats)`.
 
-`config` selects the solver backend (`ROFConfig`, `PDHGConfig`, `ADMMConfig`).
+`config` selects the solver backend. Currently implemented: `ROFConfig`.
 """
 function solve(
     problem::TVProblem,

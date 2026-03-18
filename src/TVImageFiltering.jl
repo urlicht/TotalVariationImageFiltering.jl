@@ -1,3 +1,12 @@
+"""
+TVImageFiltering.jl provides total-variation denoising primitives for
+N-dimensional arrays.
+
+Main entry points:
+- `TVProblem(...)` to describe a denoising problem
+- `solve(problem, config)` / `solve!(u, problem, config)`
+- `solve_batch(...)` / `solve_batch!(...)`
+"""
 module TVImageFiltering
 
 include("types.jl")
