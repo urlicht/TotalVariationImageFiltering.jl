@@ -29,6 +29,7 @@ Recommended entry points:
 
 - ROF denoising (`L2 + TV`) with Chambolle dual projection
 - PDHG / Chambolle-Pock for `L2 + TV` and Poisson `KL + TV`
+- PDHG primal constraints: non-negativity and box constraints
 - Isotropic and anisotropic TV
 - Single-image and batched solves
 - Automatic lambda selection for ROF (discrepancy principle and MC-SURE)

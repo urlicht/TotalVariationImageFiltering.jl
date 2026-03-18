@@ -12,6 +12,7 @@ problem = TVImageFiltering.TVProblem(
     data_fidelity = TVImageFiltering.L2Fidelity(),
     tv_mode = TVImageFiltering.IsotropicTV(),
     boundary = TVImageFiltering.Neumann(),
+    constraint = TVImageFiltering.NoConstraint(),
 )
 ```
 
@@ -23,6 +24,7 @@ Key inputs:
 - `data_fidelity`: `L2Fidelity()` or `PoissonFidelity()`.
 - `tv_mode`: `IsotropicTV()` or `AnisotropicTV()`.
 - `boundary`: currently `Neumann()`.
+- `constraint`: `NoConstraint()`, `NonnegativeConstraint()`, or `BoxConstraint(lower, upper)`.
 
 `TVProblem` is immutable, but it stores `f` by reference. For repeated solves
 with the same shape/eltype, update `f` in place (for example `copyto!`) and
@@ -52,7 +54,9 @@ TVImageFiltering.SolverStats(iterations, converged, rel_change)
 Supported solvers:
 
 - `ROFConfig` (ROF model with `L2Fidelity`).
-- `PDHGConfig` (`L2Fidelity` and `PoissonFidelity`).
+- `PDHGConfig` (`L2Fidelity` and `PoissonFidelity`, with optional primal constraints).
+
+`ROFConfig` currently supports only `constraint = NoConstraint()`.
 
 ## Warm Starts and State Reuse
 
@@ -80,6 +84,7 @@ u_batch, stats = TVImageFiltering.solve_batch(
     TVImageFiltering.PDHGConfig();
     lambda = 0.1,
     data_fidelity = TVImageFiltering.L2Fidelity(),
+    constraint = TVImageFiltering.BoxConstraint(0.0, 1.0),
 )
 ```
 

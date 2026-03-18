@@ -15,7 +15,10 @@ where `lambda >= 0` controls regularization strength.
 - `IsotropicTV`: `TV(u) = \sum_i \sqrt{\sum_d (\nabla_d u_i)^2}`
 - `AnisotropicTV`: `TV(u) = \sum_i \sum_d |\nabla_d u_i|`
 
-In this package, ROF is implemented for `L2Fidelity` only.
+In this package, ROF is implemented for `L2Fidelity` only, and only for
+unconstrained problems (`constraint = NoConstraint()`).
+
+For non-negativity or box constraints, use `PDHGConfig`.
 
 ## Dual-Projection Iteration (Chambolle)
 

@@ -22,6 +22,11 @@ u_batch, stats = TVImageFiltering.solve_batch(
 )
 ```
 
+For PDHG batch solves, you can additionally pass:
+
+- `constraint = TVImageFiltering.NonnegativeConstraint()`, or
+- `constraint = TVImageFiltering.BoxConstraint(lower, upper)`.
+
 Batch state reuse:
 
 - pass `state = [ROFState(slice1), ROFState(slice2), ...]` for ROF;
@@ -52,11 +57,13 @@ u_gpu, stats_gpu = TVImageFiltering.solve(problem_gpu, TVImageFiltering.ROFConfi
 Current behavior based on extension code/tests:
 
 - CUDA kernels are provided for gradient/divergence/projection primitives.
-- Single-image ROF on `CuArray` is supported.
-- Batched CUDA solve is specialized for `ROFConfig`.
+- Single-image ROF and PDHG on `CuArray` are supported.
+- Batched CUDA solve is specialized for `ROFConfig` and `PDHGConfig`.
 - Batched CUDA path currently requires:
-  - `L2Fidelity`,
+  - `L2Fidelity` (ROF), or `L2Fidelity` / `PoissonFidelity` (PDHG),
   - `Neumann` boundary.
+
+ROF paths currently support only `constraint = NoConstraint()`.
 
 If CUDA is unavailable, CPU paths continue to work.
 

@@ -7,20 +7,25 @@ This page documents the PDHG / Chambolle-Pock solver in `TVImageFiltering.jl`.
 The solver handles:
 
 ```math
-\min_u D(u,f) + \lambda\,\mathrm{TV}(u),
+\min_u D(u,f) + \lambda\,\mathrm{TV}(u) + I_C(u),
 ```
 
 with:
 
 - `D = L2Fidelity`: `0.5 * ||u - f||_2^2`
 - `D = PoissonFidelity`: `\sum_i (u_i - f_i\log u_i)` (up to constants)
+- `C`: pointwise convex constraint set from:
+  - `NoConstraint()`
+  - `NonnegativeConstraint()`
+  - `BoxConstraint(lower, upper)`
 
 ## Iteration Structure
 
 The implementation uses the standard primal-dual pattern:
 
 1. Dual ascent and projection onto TV dual ball of radius `lambda`.
-2. Primal proximal step for data fidelity.
+2. Primal proximal step for data fidelity, followed by exact pointwise interval
+   projection for `C`.
 3. Over-relaxed update `u_bar = u + theta * (u - u_prev)`.
 
 The primal prox operators are:

@@ -21,6 +21,10 @@ Neumann
 AbstractDataFidelity
 L2Fidelity
 PoissonFidelity
+AbstractPrimalConstraint
+NoConstraint
+NonnegativeConstraint
+BoxConstraint
 AbstractTVMode
 IsotropicTV
 AnisotropicTV
