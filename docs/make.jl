@@ -30,4 +30,9 @@ makedocs(
 deploydocs(
     repo = "github.com/urlicht/TVImageFiltering.jl.git",
     devbranch = "main",
+    versions = [
+        "stable" => "v^",
+        "v#.#.#",
+        "dev" => "dev",
+    ],
 )
