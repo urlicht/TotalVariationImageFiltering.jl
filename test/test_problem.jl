@@ -56,11 +56,31 @@ end
     prob_vector = TVImageFiltering.TVProblem(f; lambda = 0.1, spacing = [0.5, 2.0, 4.0])
     @test prob_vector.spacing == (0.5, 2.0, 4.0)
 
-    @test_throws ArgumentError TVImageFiltering.TVProblem(f; lambda = 0.1, spacing = [1.0, 2.0])
-    @test_throws ArgumentError TVImageFiltering.TVProblem(f; lambda = 0.1, spacing = (1.0, 0.0, 2.0))
-    @test_throws ArgumentError TVImageFiltering.TVProblem(f; lambda = 0.1, spacing = (1.0, -1.0, 2.0))
-    @test_throws ArgumentError TVImageFiltering.TVProblem(f; lambda = 0.1, spacing = (1.0, Inf, 2.0))
-    @test_throws ArgumentError TVImageFiltering.TVProblem(f; lambda = 0.1, spacing = "invalid")
+    @test_throws ArgumentError TVImageFiltering.TVProblem(
+        f;
+        lambda = 0.1,
+        spacing = [1.0, 2.0],
+    )
+    @test_throws ArgumentError TVImageFiltering.TVProblem(
+        f;
+        lambda = 0.1,
+        spacing = (1.0, 0.0, 2.0),
+    )
+    @test_throws ArgumentError TVImageFiltering.TVProblem(
+        f;
+        lambda = 0.1,
+        spacing = (1.0, -1.0, 2.0),
+    )
+    @test_throws ArgumentError TVImageFiltering.TVProblem(
+        f;
+        lambda = 0.1,
+        spacing = (1.0, Inf, 2.0),
+    )
+    @test_throws ArgumentError TVImageFiltering.TVProblem(
+        f;
+        lambda = 0.1,
+        spacing = "invalid",
+    )
 end
 
 @testset "TVProblem Lambda Validation" begin

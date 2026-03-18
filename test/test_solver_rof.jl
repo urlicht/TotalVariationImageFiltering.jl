@@ -26,9 +26,17 @@ end
 @testset "ROF Lambda Zero Shortcut" begin
     Random.seed!(31)
     f = randn(6, 5)
-    prob = TVImageFiltering.TVProblem(f; lambda = 0.0, tv_mode = TVImageFiltering.AnisotropicTV())
+    prob = TVImageFiltering.TVProblem(
+        f;
+        lambda = 0.0,
+        tv_mode = TVImageFiltering.AnisotropicTV(),
+    )
     u = fill(99.0, size(f))
-    stats = TVImageFiltering.solve!(u, prob, TVImageFiltering.ROFConfig(maxiter = 50, tau = 0.1))
+    stats = TVImageFiltering.solve!(
+        u,
+        prob,
+        TVImageFiltering.ROFConfig(maxiter = 50, tau = 0.1),
+    )
 
     @test u == f
     @test stats.iterations == 0
@@ -45,7 +53,8 @@ end
     )
 
     for mode in (TVImageFiltering.AnisotropicTV(), TVImageFiltering.IsotropicTV())
-        for (f1, f2, lambda, spacing) in ((-1.3, 2.4, 0.5, 1.0), (0.2, 0.8, 1.0, 2.0), (3.0, -2.0, 0.1, 0.5))
+        for (f1, f2, lambda, spacing) in
+            ((-1.3, 2.4, 0.5, 1.0), (0.2, 0.8, 1.0, 2.0), (3.0, -2.0, 0.1, 0.5))
             f = [f1, f2]
             prob = TVImageFiltering.TVProblem(
                 f;
@@ -64,7 +73,12 @@ end
 
 @testset "ROF Constant Input Is Fixed Point" begin
     f = fill(2.25, 20)
-    config = TVImageFiltering.ROFConfig(maxiter = 2000, tau = 0.01, tol = 1e-10, check_every = 10)
+    config = TVImageFiltering.ROFConfig(
+        maxiter = 2000,
+        tau = 0.01,
+        tol = 1e-10,
+        check_every = 10,
+    )
 
     for mode in (TVImageFiltering.AnisotropicTV(), TVImageFiltering.IsotropicTV())
         prob = TVImageFiltering.TVProblem(f; lambda = 1.0, spacing = 0.3, tv_mode = mode)
@@ -103,7 +117,12 @@ end
             spacing = 0.5,
             tv_mode = TVImageFiltering.AnisotropicTV(),
         ),
-        TVImageFiltering.ROFConfig(maxiter = 10_000, tau = 0.0625, tol = 1e-10, check_every = 20),
+        TVImageFiltering.ROFConfig(
+            maxiter = 10_000,
+            tau = 0.0625,
+            tol = 1e-10,
+            check_every = 20,
+        ),
     )
     u_coarse, _ = TVImageFiltering.solve(
         TVImageFiltering.TVProblem(
@@ -112,7 +131,12 @@ end
             spacing = 2.0,
             tv_mode = TVImageFiltering.AnisotropicTV(),
         ),
-        TVImageFiltering.ROFConfig(maxiter = 10_000, tau = 0.0625, tol = 1e-10, check_every = 20),
+        TVImageFiltering.ROFConfig(
+            maxiter = 10_000,
+            tau = 0.0625,
+            tol = 1e-10,
+            check_every = 20,
+        ),
     )
     @test abs(u_fine[2] - u_fine[1]) < abs(u_coarse[2] - u_coarse[1])
 end
@@ -129,12 +153,22 @@ end
 
     Random.seed!(41)
     f2 = randn(16)
-    prob2 = TVImageFiltering.TVProblem(f2; lambda = 0.2, tv_mode = TVImageFiltering.AnisotropicTV())
-    cfg = TVImageFiltering.ROFConfig(maxiter = 2000, tau = 0.0625, tol = 1e-8, check_every = 20)
+    prob2 = TVImageFiltering.TVProblem(
+        f2;
+        lambda = 0.2,
+        tv_mode = TVImageFiltering.AnisotropicTV(),
+    )
+    cfg = TVImageFiltering.ROFConfig(
+        maxiter = 2000,
+        tau = 0.0625,
+        tol = 1e-8,
+        check_every = 20,
+    )
     state = TVImageFiltering.ROFState(f2)
 
     u1, stats1 = TVImageFiltering.solve(prob2, cfg; state = state)
-    u2, stats2 = TVImageFiltering.solve(prob2, cfg; init = fill(5.0, size(f2)), state = state)
+    u2, stats2 =
+        TVImageFiltering.solve(prob2, cfg; init = fill(5.0, size(f2)), state = state)
     @test stats1.converged
     @test stats2.converged
     @test maximum(abs.(u1 .- u2)) <= 1e-7

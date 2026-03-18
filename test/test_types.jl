@@ -36,8 +36,16 @@ end
     cfg_float32 = TVImageFiltering.ROFConfig(tau = Float32(0.2), tol = Float32(1e-3))
     @test cfg_float32 isa TVImageFiltering.ROFConfig{Float32}
 
-    @test_throws ArgumentError TVImageFiltering._validate(TVImageFiltering.ROFConfig(maxiter = 0))
-    @test_throws ArgumentError TVImageFiltering._validate(TVImageFiltering.ROFConfig(check_every = 0))
-    @test_throws ArgumentError TVImageFiltering._validate(TVImageFiltering.ROFConfig(tau = 0.0))
-    @test_throws ArgumentError TVImageFiltering._validate(TVImageFiltering.ROFConfig(tol = -1e-6))
+    @test_throws ArgumentError TVImageFiltering._validate(
+        TVImageFiltering.ROFConfig(maxiter = 0),
+    )
+    @test_throws ArgumentError TVImageFiltering._validate(
+        TVImageFiltering.ROFConfig(check_every = 0),
+    )
+    @test_throws ArgumentError TVImageFiltering._validate(
+        TVImageFiltering.ROFConfig(tau = 0.0),
+    )
+    @test_throws ArgumentError TVImageFiltering._validate(
+        TVImageFiltering.ROFConfig(tol = -1e-6),
+    )
 end

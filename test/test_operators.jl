@@ -12,8 +12,8 @@ using TVImageFiltering
     @test p[1] !== p[2]
     @test p[2] !== p[3]
 
-    fill!(p[1], 1f0)
-    @test !all(p[2] .== 1f0)
+    fill!(p[1], 1.0f0)
+    @test !all(p[2] .== 1.0f0)
 end
 
 @testset "gradient! exact values" begin

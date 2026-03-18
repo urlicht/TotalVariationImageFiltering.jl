@@ -35,8 +35,17 @@ end
 
 @testset "solve API Keyword Forwarding to solve!" begin
     f = randn(20)
-    prob = TVImageFiltering.TVProblem(f; lambda = 0.2, tv_mode = TVImageFiltering.AnisotropicTV())
-    cfg = TVImageFiltering.ROFConfig(maxiter = 2000, tau = 0.0625, tol = 1e-8, check_every = 20)
+    prob = TVImageFiltering.TVProblem(
+        f;
+        lambda = 0.2,
+        tv_mode = TVImageFiltering.AnisotropicTV(),
+    )
+    cfg = TVImageFiltering.ROFConfig(
+        maxiter = 2000,
+        tau = 0.0625,
+        tol = 1e-8,
+        check_every = 20,
+    )
     state = TVImageFiltering.ROFState(f)
 
     u1, s1 = TVImageFiltering.solve(prob, cfg; state = state)
