@@ -3,9 +3,12 @@ Configuration for the PDHG / Chambolle-Pock primal-dual solver.
 
 This solver targets TV-regularized models of the form
 
-    minimize_u D(u, f) + lambda * TV(u)
+    minimize_u D(u, f) + lambda * TV(u) + I_C(u)
 
-where `D` is either `L2Fidelity` or `PoissonFidelity`.
+where:
+- `D` is either `L2Fidelity` or `PoissonFidelity`,
+- `C` is a pointwise convex set from `NoConstraint()`,
+  `NonnegativeConstraint()`, or `BoxConstraint(lower, upper)`.
 
 The primal-dual step sizes must satisfy:
 
@@ -144,6 +147,87 @@ function _validate_poisson_data(f::AbstractArray{T}) where {T<:AbstractFloat}
     return nothing
 end
 
+function _constraint_bounds(
+    ::Type{T},
+    ::NoConstraint,
+) where {T<:AbstractFloat}
+    return -T(Inf), T(Inf)
+end
+
+function _constraint_bounds(
+    ::Type{T},
+    ::NonnegativeConstraint,
+) where {T<:AbstractFloat}
+    return zero(T), T(Inf)
+end
+
+function _constraint_bounds(
+    ::Type{T},
+    constraint::BoxConstraint,
+) where {T<:AbstractFloat}
+    return T(constraint.lower), T(constraint.upper)
+end
+
+function _constraint_bounds(
+    ::Type{T},
+    constraint::AbstractPrimalConstraint,
+) where {T<:AbstractFloat}
+    throw(
+        ArgumentError(
+            "unsupported constraint type $(typeof(constraint)); supported: NoConstraint, NonnegativeConstraint, BoxConstraint",
+        ),
+    )
+end
+
+function _project_interval!(u::AbstractArray{T}, lower::T, upper::T) where {T<:AbstractFloat}
+    neg_inf = -T(Inf)
+    pos_inf = T(Inf)
+
+    if (lower == neg_inf) && (upper == pos_inf)
+        return nothing
+    elseif upper == pos_inf
+        @. u = ifelse(u < lower, lower, u)
+    elseif lower == neg_inf
+        @. u = ifelse(u > upper, upper, u)
+    else
+        @. u = clamp(u, lower, upper)
+    end
+
+    return nothing
+end
+
+function _pdhg_primal_bounds(problem::TVProblem{T,N}) where {T<:AbstractFloat,N}
+    lower, upper = _constraint_bounds(T, problem.constraint)
+    if problem.data_fidelity isa PoissonFidelity
+        lower = max(lower, zero(T))
+    end
+    return lower, upper
+end
+
+function _validate_pdhg_constraint(problem::TVProblem{T,N}) where {T<:AbstractFloat,N}
+    lower, upper = _constraint_bounds(T, problem.constraint)
+    lower <= upper || throw(
+        ArgumentError("constraint lower bound must be <= upper bound, got [$lower, $upper]"),
+    )
+
+    if problem.data_fidelity isa PoissonFidelity
+        upper >= zero(T) || throw(
+            ArgumentError(
+                "PoissonFidelity with constraint [$lower, $upper] is infeasible; upper bound must be >= 0",
+            ),
+        )
+        if (upper == zero(T)) && any(problem.f .> zero(T))
+            throw(
+                ArgumentError(
+                    "PoissonFidelity with upper bound 0 is infeasible when observation data contains positive values",
+                ),
+            )
+        end
+    end
+
+    return nothing
+end
+
 function _prox_data!(
     out::AbstractArray{T},
     v::AbstractArray{T},
@@ -182,6 +266,29 @@ function _prox_data!(
             "PDHG currently supports only L2Fidelity and PoissonFidelity, got $(typeof(data_fidelity))",
         ),
     )
+end
+
+function _pdhg_data_minimizer!(
+    u::AbstractArray{T},
+    f::AbstractArray{T},
+    data_fidelity::AbstractDataFidelity,
+    lower::T,
+    upper::T,
+) where {T<:AbstractFloat}
+    if data_fidelity isa L2Fidelity
+        copyto!(u, f)
+    elseif data_fidelity isa PoissonFidelity
+        copyto!(u, f)
+    else
+        throw(
+            ArgumentError(
+                "PDHG currently supports only L2Fidelity and PoissonFidelity, got $(typeof(data_fidelity))",
+            ),
+        )
+    end
+
+    _project_interval!(u, lower, upper)
+    return nothing
 end
 
 function _validate_pdhg_data_fidelity(problem::TVProblem)
@@ -272,6 +379,10 @@ Stopping criterion:
 - `solve!` checks both relative primal change and a PDHG primal-dual residual.
 - The primal-dual residual is normalized by `sqrt(length(u))`.
 - Convergence uses `max(relative_primal_change, primal_dual_residual) <= tol`.
+
+Constraints:
+- If `problem.constraint` is not `NoConstraint()`, the primal update applies the
+  exact pointwise constrained proximal map for the supported fidelities.
 """
 function solve!(
     u::AbstractArray{T,N},
@@ -281,16 +392,19 @@ function solve!(
 ) where {T<:AbstractFloat,N}
     _validate(config)
     _validate_pdhg_data_fidelity(problem)
+    _validate_pdhg_constraint(problem)
     size(u) == size(problem.f) ||
         throw(ArgumentError("You must have the same size as problem.f"))
     problem.lambda >= zero(T) ||
         throw(ArgumentError("lambda must be non-negative, got $(problem.lambda)"))
 
+    primal_lower, primal_upper = _pdhg_primal_bounds(problem)
+
     local_state = state === nothing ? nothing : state
     local_state === nothing || _validate_state_shape(local_state, size(u))
 
     if problem.lambda == zero(T)
-        copyto!(u, problem.f)
+        _pdhg_data_minimizer!(u, problem.f, problem.data_fidelity, primal_lower, primal_upper)
         return SolverStats{T}(0, true, zero(T))
     end
 
@@ -338,6 +452,7 @@ function solve!(
             tau_t,
             problem.data_fidelity,
         )
+        _project_interval!(local_state.u, primal_lower, primal_upper)
         @. local_state.u_bar = local_state.u + theta_t * (local_state.u - local_state.u_prev)
 
         if (k % config.check_every == 0) || (k == config.maxiter)
