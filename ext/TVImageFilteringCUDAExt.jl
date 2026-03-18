@@ -100,6 +100,26 @@ function _project_anisotropic_kernel!(p, lower, upper, len::Int)
     return nothing
 end
 
+function _dual_update_if_active_kernel!(
+    pd,
+    grad_pd,
+    tau,
+    done_mask,
+    batch_stride::Int,
+    batch_size::Int,
+    len::Int,
+)
+    index = (blockIdx().x - 1) * blockDim().x + threadIdx().x
+    if index <= len
+        i = Int(index)
+        batch_idx = ((i - 1) ÷ batch_stride) % batch_size + 1
+        @inbounds if done_mask[batch_idx] == UInt8(0)
+            pd[i] = pd[i] + tau * grad_pd[i]
+        end
+    end
+    return nothing
+end
+
 function _gradient_spatial!(
     g::NTuple{M,AT},
     u::CUDA.CuArray{T,N},
@@ -242,6 +262,10 @@ function _rof_batch_dual_step!(
     lambda::T,
     inv_spacing::NTuple{M,T},
     tv_mode::AbstractTVMode,
+    done_mask::CUDA.CuArray{UInt8,1},
+    has_done::Bool,
+    batch_stride::Int,
+    batch_size::Int,
 ) where {T<:AbstractFloat,N,M}
     inv_lambda = inv(lambda)
 
@@ -249,8 +273,25 @@ function _rof_batch_dual_step!(
     @. state.g = state.divp - inv_lambda * f_batch
 
     _gradient_spatial!(state.grad_g, state.g, inv_spacing)
-    @inbounds for d = 1:M
-        @. state.p[d] = state.p[d] + tau * state.grad_g[d]
+    if has_done
+        len = length(state.p[1])
+        len > 0 && batch_size > 0 && batch_stride > 0 || return nothing
+        threads, blocks = _launch_config(len)
+        @inbounds for d = 1:M
+            CUDA.@cuda threads = threads blocks = blocks _dual_update_if_active_kernel!(
+                state.p[d],
+                state.grad_g[d],
+                tau,
+                done_mask,
+                batch_stride,
+                batch_size,
+                len,
+            )
+        end
+    else
+        @inbounds for d = 1:M
+            @. state.p[d] = state.p[d] + tau * state.grad_g[d]
+        end
     end
 
     project_dual_ball!(state.p, one(T), tv_mode)
@@ -275,6 +316,11 @@ function solve_batch!(
         throw(ArgumentError("f_batch must have at least 2 dimensions (spatial..., batch)"))
     size(u_batch) == size(f_batch) ||
         throw(ArgumentError("u_batch and f_batch must have matching sizes"))
+    batch_count = size(f_batch, N)
+    if batch_count == 0
+        copyto!(u_batch, f_batch)
+        return SolverStats{T}(0, true, zero(T))
+    end
 
     TVImageFiltering._validate(config)
     data_fidelity isa L2Fidelity ||
@@ -319,9 +365,13 @@ function solve_batch!(
     end
 
     copyto!(local_state.u, u_batch)
-    rel_change = T(Inf)
-    converged = false
-    iterations = config.maxiter
+    done_host = zeros(UInt8, batch_count)
+    done_device = CUDA.zeros(UInt8, batch_count)
+    rel_changes = fill(T(Inf), batch_count)
+    iterations_per_slice = fill(config.maxiter, batch_count)
+    active_count = batch_count
+    has_done = false
+    batch_stride = stride(f_batch, N)
 
     for k = 1:config.maxiter
         copyto!(local_state.u_prev, local_state.u)
@@ -332,22 +382,47 @@ function solve_batch!(
             lambda_t,
             inv_spacing,
             tv_mode,
+            done_device,
+            has_done,
+            batch_stride,
+            batch_count,
         )
 
         if (k % config.check_every == 0) || (k == config.maxiter)
-            rel_change = TVImageFiltering._relative_change(local_state.u_prev, local_state.u)
-            if rel_change <= T(config.tol)
-                converged = true
-                iterations = k
-                break
+            mask_changed = false
+            @views for b = 1:batch_count
+                done_host[b] == UInt8(1) && continue
+                rel = TVImageFiltering._relative_change(
+                    selectdim(local_state.u_prev, N, b),
+                    selectdim(local_state.u, N, b),
+                )
+                rel_changes[b] = rel
+                if rel <= T(config.tol)
+                    done_host[b] = UInt8(1)
+                    iterations_per_slice[b] = k
+                    active_count -= 1
+                    mask_changed = true
+                end
+            end
+
+            if active_count == 0
+                copyto!(u_batch, local_state.u)
+                return SolverStats{T}(
+                    maximum(iterations_per_slice),
+                    true,
+                    maximum(rel_changes),
+                )
+            end
+
+            if mask_changed
+                has_done = true
+                copyto!(done_device, done_host)
             end
         end
-
-        iterations = k
     end
 
     copyto!(u_batch, local_state.u)
-    return SolverStats{T}(iterations, converged, rel_change)
+    return SolverStats{T}(maximum(iterations_per_slice), false, maximum(rel_changes))
 end
 
 end # module
