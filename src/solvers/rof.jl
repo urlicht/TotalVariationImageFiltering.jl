@@ -64,24 +64,37 @@ function _rof_dual_step!(
     state::ROFState{T,N},
     problem::TVProblem{T,N},
     tau::T,
+    inv_spacing::NTuple{N,T},
 ) where {T<:AbstractFloat,N}
     lambda = problem.lambda
     inv_lambda = inv(lambda)
 
-    divergence!(state.divp, state.p, problem.boundary)
+    divergence!(state.divp, state.p, problem.boundary, inv_spacing)
     @. state.g = state.divp - inv_lambda * problem.f
 
-    gradient!(state.grad_g, state.g, problem.boundary)
+    gradient!(state.grad_g, state.g, problem.boundary, inv_spacing)
     @inbounds for d = 1:N
         @. state.p[d] = state.p[d] + tau * state.grad_g[d]
     end
 
     project_dual_ball!(state.p, one(T), problem.tv_mode)
 
-    divergence!(state.divp, state.p, problem.boundary)
+    divergence!(state.divp, state.p, problem.boundary, inv_spacing)
     @. state.u = problem.f - lambda * state.divp
 
     return nothing
+end
+
+function _tau_upper_bound(inv_spacing::NTuple{N,T}, shape::NTuple{N,Int}) where {N,T<:AbstractFloat}
+    lipschitz_term = zero(T)
+    @inbounds for d = 1:N
+        if shape[d] > 1
+            lipschitz_term += abs2(inv_spacing[d])
+        end
+    end
+
+    lipschitz_term == zero(T) && return T(Inf)
+    return inv(T(2) * lipschitz_term)
 end
 
 """
@@ -113,11 +126,18 @@ function solve!(
     converged = false
     iterations = config.maxiter
     tau_t = T(config.tau)
+    inv_spacing = ntuple(d -> inv(problem.spacing[d]), Val(N))
+    tau_upper = _tau_upper_bound(inv_spacing, size(problem.f))
+    tau_t < tau_upper || throw(
+        ArgumentError(
+            "tau must be < $(tau_upper) for this grid spacing and shape; got $(tau_t)",
+        ),
+    )
 
     for k = 1:config.maxiter
         copyto!(local_state.u_prev, local_state.u)
 
-        _rof_dual_step!(local_state, problem, tau_t)
+        _rof_dual_step!(local_state, problem, tau_t, inv_spacing)
 
         if (k % config.check_every == 0) || (k == config.maxiter)
             rel_change = _relative_change(local_state.u_prev, local_state.u)
