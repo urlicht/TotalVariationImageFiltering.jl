@@ -127,6 +127,74 @@ u_batch, stats = TVImageFiltering.solve_batch(
 
 For `f_batch` with shape `(spatial..., batch)`, TV operators are applied only over spatial dimensions and the last dimension is treated as batch index.
 
+## Automatic Lambda Selection
+
+For ROF denoising (`L2 + TV`), the package provides two principled options to
+choose `lambda` for images and volumes (`N`-D arrays).
+
+### 1) Discrepancy Principle (Morozov)
+
+Use this when noise standard deviation `sigma` is known (or can be estimated).
+The selector searches for `lambda` such that
+
+```math
+\|u_\lambda - f\|_2^2 \approx N \sigma^2
+```
+
+where `N = length(f)`.
+
+```julia
+using TVImageFiltering
+
+selection = TVImageFiltering.select_lambda_discrepancy(
+    noisy,
+    TVImageFiltering.ROFConfig();
+    sigma = 0.12,
+    lambda_min = 0.0,
+    lambda_max = 0.2,
+    rtol = 0.05,
+)
+
+lambda_hat = selection.lambda
+u = selection.u
+println("relative mismatch = ", selection.relative_mismatch)
+```
+
+Algorithm used:
+- bracket + bisection on `lambda`
+- objective for search: residual matching to `target_scale * N * sigma^2`
+
+### 2) Monte-Carlo SURE (Grid Search)
+
+Use this when Gaussian noise is assumed and you want risk-driven tuning without
+ground truth.
+
+```julia
+using Random
+using TVImageFiltering
+
+selection = TVImageFiltering.select_lambda_sure(
+    noisy,
+    TVImageFiltering.ROFConfig();
+    sigma = 0.12,
+    lambda_grid = [0.0, 0.03, 0.06, 0.1, 0.16],
+    mc_samples = 2,
+    rng = MersenneTwister(1),
+)
+
+lambda_hat = selection.lambda
+u = selection.u
+println("best SURE = ", selection.sure)
+```
+
+Algorithm used:
+- for each candidate `lambda`, solve ROF and estimate SURE
+- divergence term is approximated by Monte-Carlo finite differences
+
+Notes:
+- both selectors are currently designed for the ROF solver path
+- the result objects include diagnostics (residual, SURE, number of solves, etc.)
+
 ## Optional CUDA Usage
 
 The CUDA extension loads automatically when both `TVImageFiltering` and `CUDA` are available.
@@ -153,6 +221,27 @@ Batch solving on GPU is also supported via `solve_batch` with `CuArray` input.
 - `tau` must satisfy the stability bound:
   - `tau < 1 / (2 * sum(h_d^(-2)))` over spatial dimensions with size > 1
   - with unit spacing in 2D, this means `tau < 0.25`
+
+## References
+
+- L. I. Rudin, S. Osher, E. Fatemi, "Nonlinear total variation based noise
+  removal algorithms," *Physica D* 60(1-4):259-268, 1992.
+  DOI: [10.1016/0167-2789(92)90242-F](https://doi.org/10.1016/0167-2789(92)90242-F)
+- A. Chambolle, "An algorithm for total variation minimization and
+  applications," *JMIV* 20:89-97, 2004.
+  DOI: [10.1023/B:JMIV.0000011325.36760.1E](https://doi.org/10.1023/B:JMIV.0000011325.36760.1E)
+- V. A. Morozov, *Methods for Solving Incorrectly Posed Problems*, 1984.
+  DOI: [10.1007/978-1-4612-5280-1](https://doi.org/10.1007/978-1-4612-5280-1)
+- Y. Wen and R. H. Chan, "Parameter selection for total-variation based image
+  restoration using discrepancy principle," *IEEE TIP* 21(4):1770-1781, 2012.
+  DOI: [10.1109/TIP.2011.2181401](https://doi.org/10.1109/TIP.2011.2181401)
+- S. Ramani, T. Blu, M. Unser, "Monte-Carlo SURE: A black-box optimization of
+  regularization parameters for general denoising algorithms," *IEEE TIP*
+  17(9):1540-1554, 2008.
+  DOI: [10.1109/TIP.2008.2001404](https://doi.org/10.1109/TIP.2008.2001404)
+- Y. Lin, B. Wohlberg, H. Guo, "UPRE method for total variation parameter
+  selection," *Signal Processing* 90(8):2546-2551, 2010.
+  DOI: [10.1016/j.sigpro.2010.02.025](https://doi.org/10.1016/j.sigpro.2010.02.025)
 
 ## Running Tests
 

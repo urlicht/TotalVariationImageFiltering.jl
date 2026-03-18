@@ -14,5 +14,6 @@ include("problem.jl")
 include("operators/operators.jl")
 include("solvers/solvers.jl")
 include("api.jl")
+include("lambda_selection.jl")
 
 end # module TVImageFiltering
