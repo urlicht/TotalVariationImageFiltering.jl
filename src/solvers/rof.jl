@@ -1,7 +1,8 @@
 """
 Configuration for the ROF dual-projection solver.
 
-This solver targets the Rudin-Osher-Fatemi denoising model with `L2Fidelity`:
+This solver targets the unconstrained Rudin-Osher-Fatemi denoising model with
+`L2Fidelity`:
 
     minimize_u 0.5 * ||u - f||_2^2 + lambda * TV(u)
 
@@ -159,6 +160,10 @@ Run ROF denoising in place.
 
 `u` is both the initial guess and output buffer.
 
+Constraint support:
+- `ROFConfig` supports only `problem.constraint = NoConstraint()`.
+- For constrained problems, use `PDHGConfig`.
+
 State and buffer reuse:
 - Reuse `u` and `state` across calls to avoid allocations.
 - `u` is copied into solver state and acts as primal warm start.
@@ -201,6 +206,11 @@ function solve!(
     _validate(config)
     problem.data_fidelity isa L2Fidelity ||
         throw(ArgumentError("ROF currently supports only L2Fidelity"))
+    problem.constraint isa NoConstraint || throw(
+        ArgumentError(
+            "ROF currently supports only unconstrained problems; set constraint = NoConstraint() or use PDHGConfig",
+        ),
+    )
     size(u) == size(problem.f) ||
         throw(ArgumentError("You must have the same size as problem.f"))
     problem.lambda >= zero(T) ||
