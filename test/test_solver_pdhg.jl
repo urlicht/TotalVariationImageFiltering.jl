@@ -82,6 +82,37 @@ end
     @test TVImageFiltering._pdhg_operator_norm_sq_upper_bound((1.0, 2.0), (1, 1)) == 0.0
 end
 
+@testset "PDHG Primal Residual Sign Convention" begin
+    # This test guards the sign in the primal residual:
+    # r_p = (u_prev - u)/tau - K*(p_prev - p), with K* = -div => +div term.
+    f = zeros(Float64, 6)
+    problem = TVImageFiltering.TVProblem(
+        f;
+        lambda = 0.1,
+        spacing = (0.5,),
+        data_fidelity = TVImageFiltering.L2Fidelity(),
+    )
+    state = TVImageFiltering.PDHGState(f)
+
+    state.u_prev .= [0.5, -1.0, 1.5, -2.0, 2.5, -3.0]
+    state.u .= [0.0, 0.25, -0.5, 0.75, -1.0, 1.25]
+    state.p_prev[1] .= [1.0, -2.0, 3.0, -4.0, 5.0, -6.0]
+    state.p[1] .= [-1.5, 2.5, -3.5, 4.5, -5.5, 6.5]
+
+    tau = 0.3
+    sigma = 0.7
+    inv_spacing = ntuple(d -> inv(problem.spacing[d]), Val(1))
+
+    delta_u = state.u_prev .- state.u
+    delta_p = (state.p_prev[1] .- state.p[1],)
+    div_delta_p = similar(f)
+    TVImageFiltering.divergence!(div_delta_p, delta_p, problem.boundary, inv_spacing)
+    expected_primal = delta_u ./ tau .+ div_delta_p
+
+    _ = TVImageFiltering._pdhg_relative_residual!(state, problem, tau, sigma, inv_spacing)
+    @test isapprox(state.primal_tmp, expected_primal; atol = 1e-12, rtol = 0.0)
+end
+
 @testset "PDHG L2 Matches ROF" begin
     Random.seed!(71)
     f = randn(32, 24)

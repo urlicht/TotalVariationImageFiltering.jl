@@ -345,7 +345,7 @@ function _pdhg_relative_residual!(
 
     @. state.divp = state.u_prev - state.u
 
-    @. state.primal_tmp = state.divp / tau - state.primal_tmp
+    @. state.primal_tmp = state.divp / tau + state.primal_tmp
     primal_res_norm = T(sqrt(sum(abs2, state.primal_tmp)))
 
     gradient!(state.grad_u_bar, state.divp, problem.boundary, inv_spacing)
