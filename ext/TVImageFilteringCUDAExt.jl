@@ -4,6 +4,7 @@ using CUDA
 using TVImageFiltering
 
 import TVImageFiltering:
+    AbstractPrimalConstraint,
     AbstractBoundaryCondition,
     AbstractDataFidelity,
     AbstractTVMode,
@@ -14,6 +15,7 @@ import TVImageFiltering:
     PDHGConfig,
     PDHGState,
     PoissonFidelity,
+    NoConstraint,
     ROFConfig,
     SolverStats,
     divergence!,
@@ -327,6 +329,8 @@ function _pdhg_primal_and_overrelax!(
     tau::T,
     theta::T,
     data_fidelity::AbstractDataFidelity,
+    lower::T,
+    upper::T,
 ) where {T<:AbstractFloat,N}
     len = length(state.u)
     len == 0 && return nothing
@@ -363,6 +367,8 @@ function _pdhg_primal_and_overrelax!(
             ),
         )
     end
+
+    TVImageFiltering._project_interval!(state.u, lower, upper)
 
     CUDA.@cuda threads = threads blocks = blocks _pdhg_ubar_kernel!(
         state.u_bar,
@@ -542,6 +548,7 @@ function solve_batch!(
     data_fidelity::AbstractDataFidelity = L2Fidelity(),
     tv_mode::AbstractTVMode = IsotropicTV(),
     boundary::AbstractBoundaryCondition = Neumann(),
+    constraint::AbstractPrimalConstraint = NoConstraint(),
     state = nothing,
 ) where {T<:AbstractFloat,N}
     N >= 2 ||
@@ -557,6 +564,11 @@ function solve_batch!(
     TVImageFiltering._validate(config)
     data_fidelity isa L2Fidelity ||
         throw(ArgumentError("ROF currently supports only L2Fidelity"))
+    constraint isa NoConstraint || throw(
+        ArgumentError(
+            "ROF currently supports only unconstrained problems; set constraint = NoConstraint() or use PDHGConfig",
+        ),
+    )
     boundary isa Neumann ||
         throw(ArgumentError("ROF batch CUDA currently supports only Neumann boundary"))
 
@@ -655,7 +667,7 @@ end
 
 function solve!(
     u::CUDA.CuArray{T,N},
-    problem::TVImageFiltering.TVProblem{T,N,AF,DF,TV,BC},
+    problem::TVImageFiltering.TVProblem{T,N,AF,DF,TV,BC,PC},
     config::PDHGConfig;
     state::Union{Nothing,PDHGState{T,N}} = nothing,
 ) where {
@@ -665,9 +677,11 @@ function solve!(
     DF<:AbstractDataFidelity,
     TV<:AbstractTVMode,
     BC<:AbstractBoundaryCondition,
+    PC<:AbstractPrimalConstraint,
 }
     TVImageFiltering._validate(config)
     TVImageFiltering._validate_pdhg_data_fidelity(problem)
+    TVImageFiltering._validate_pdhg_constraint(problem)
     problem.boundary isa Neumann ||
         throw(ArgumentError("PDHG CUDA currently supports only Neumann boundary"))
     size(u) == size(problem.f) ||
@@ -675,11 +689,19 @@ function solve!(
     problem.lambda >= zero(T) ||
         throw(ArgumentError("lambda must be non-negative, got $(problem.lambda)"))
 
+    primal_lower, primal_upper = TVImageFiltering._pdhg_primal_bounds(problem)
+
     local_state = state === nothing ? nothing : state
     local_state === nothing || TVImageFiltering._validate_state_shape(local_state, size(u))
 
     if problem.lambda == zero(T)
-        copyto!(u, problem.f)
+        TVImageFiltering._pdhg_data_minimizer!(
+            u,
+            problem.f,
+            problem.data_fidelity,
+            primal_lower,
+            primal_upper,
+        )
         return SolverStats{T}(0, true, zero(T))
     end
 
@@ -723,6 +745,8 @@ function solve!(
             tau_t,
             theta_t,
             problem.data_fidelity,
+            primal_lower,
+            primal_upper,
         )
 
         if (k % config.check_every == 0) || (k == config.maxiter)
@@ -793,6 +817,30 @@ function PDHGBatchState(reference::CUDA.CuArray{T,N}, ::Val{M}) where {T<:Abstra
     )
 end
 
+function _batch_pdhg_primal_bounds(
+    f_batch::CUDA.CuArray{T},
+    data_fidelity::AbstractDataFidelity,
+    constraint::AbstractPrimalConstraint,
+) where {T<:AbstractFloat}
+    lower, upper = TVImageFiltering._constraint_bounds(T, constraint)
+    if data_fidelity isa PoissonFidelity
+        upper >= zero(T) || throw(
+            ArgumentError(
+                "PoissonFidelity with constraint [$lower, $upper] is infeasible; upper bound must be >= 0",
+            ),
+        )
+        if (upper == zero(T)) && any(f_batch .> zero(T))
+            throw(
+                ArgumentError(
+                    "PoissonFidelity with upper bound 0 is infeasible when observation data contains positive values",
+                ),
+            )
+        end
+        lower = max(lower, zero(T))
+    end
+    return lower, upper
+end
+
 function _pdhg_batch_step!(
     state::PDHGBatchState{T,N,M},
     f_batch::CUDA.CuArray{T,N},
@@ -800,6 +848,8 @@ function _pdhg_batch_step!(
     sigma::T,
     theta::T,
     lambda::T,
+    lower::T,
+    upper::T,
     inv_spacing::NTuple{M,T},
     data_fidelity::AbstractDataFidelity,
     tv_mode::AbstractTVMode,
@@ -881,6 +931,8 @@ function _pdhg_batch_step!(
             )
         end
 
+        TVImageFiltering._project_interval!(state.u, lower, upper)
+
         CUDA.@cuda threads = threads blocks = blocks _pdhg_ubar_if_active_kernel!(
             state.u_bar,
             state.u,
@@ -924,6 +976,8 @@ function _pdhg_batch_step!(
             )
         end
 
+        TVImageFiltering._project_interval!(state.u, lower, upper)
+
         CUDA.@cuda threads = threads blocks = blocks _pdhg_ubar_kernel!(
             state.u_bar,
             state.u,
@@ -961,6 +1015,7 @@ function solve_batch!(
     data_fidelity::AbstractDataFidelity = L2Fidelity(),
     tv_mode::AbstractTVMode = IsotropicTV(),
     boundary::AbstractBoundaryCondition = Neumann(),
+    constraint::AbstractPrimalConstraint = NoConstraint(),
     state = nothing,
 ) where {T<:AbstractFloat,N}
     N >= 2 ||
@@ -988,8 +1043,15 @@ function solve_batch!(
 
     lambda_t = T(lambda)
     lambda_t >= zero(T) || throw(ArgumentError("lambda must be non-negative"))
+    primal_lower, primal_upper = _batch_pdhg_primal_bounds(f_batch, data_fidelity, constraint)
     if lambda_t == zero(T)
-        copyto!(u_batch, f_batch)
+        TVImageFiltering._pdhg_data_minimizer!(
+            u_batch,
+            f_batch,
+            data_fidelity,
+            primal_lower,
+            primal_upper,
+        )
         return SolverStats{T}(0, true, zero(T))
     end
 
@@ -1061,6 +1123,8 @@ function solve_batch!(
             sigma_t,
             theta_t,
             lambda_t,
+            primal_lower,
+            primal_upper,
             inv_spacing,
             data_fidelity,
             tv_mode,
