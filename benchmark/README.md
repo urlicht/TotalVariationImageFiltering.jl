@@ -41,3 +41,14 @@ Use `--help` for all options:
 ```bash
 julia --project=benchmark benchmark/run_benchmarks.jl --help
 ```
+
+## CUDA Batching vs Non-Batching
+
+For CUDA-only comparison across batch sizes (`1,4,...,1024`):
+
+```bash
+julia --project=benchmark -e 'using Pkg; Pkg.add("CUDA")'
+julia --project=benchmark benchmark/compare_batching_cuda.jl \
+  --batch-sizes=1,4,8,16,32,64,128,256,512,1024 \
+  --output=benchmark/results/cuda_batching_vs_no_batching.csv
+```
