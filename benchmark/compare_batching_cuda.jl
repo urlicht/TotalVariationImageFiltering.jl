@@ -11,7 +11,7 @@ if Base.find_package("CUDA") !== nothing
     @eval using CUDA
 end
 
-const DEFAULT_BATCH_SIZES = [1, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
+const DEFAULT_BATCH_SIZES = [1, 4, 8, 16, 32, 64, 128, 256]
 const DEFAULT_OUTPUT =
     normpath(joinpath(@__DIR__, "results", "cuda_batching_vs_no_batching.csv"))
 const DEFAULT_SEED = 20260318
@@ -71,7 +71,7 @@ Options:
   --evals=N                     BenchmarkTools evals per sample. Default: 1
   --seed=N                      RNG seed. Default: $(DEFAULT_SEED)
   --batch-sizes=1,4,8,...       Batch sizes to compare.
-                                Default: 1,4,8,16,32,64,128,256,512,1024
+                                Default: 1,4,8,16,32,64,128,256
   --size=128x128                Base image size. Default: 128x128
   --maxiter=N                   ROF iterations. Default: 120
   --lambda=0.12                 TV regularization weight. Default: 0.12
