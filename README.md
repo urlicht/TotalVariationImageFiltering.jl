@@ -247,8 +247,50 @@ Batch solving on GPU is also supported via `solve_batch` with `CuArray` input.
   selection," *Signal Processing* 90(8):2546-2551, 2010.
   DOI: [10.1016/j.sigpro.2010.02.025](https://doi.org/10.1016/j.sigpro.2010.02.025)
 
-## Running Tests
+## Performance
+### Benchmark command
+```bash
+julia --project=benchmark benchmark/run_benchmarks.jl --backend=both --samples=10 --output=benchmark/results/both.csv
+```
 
+### Benchmark results
+
+
+### Configuration
+```
+CUDA toolchain: 
+- runtime 13.2, artifact installation
+- driver 580.95.5 for 13.2
+- compiler 13.2
+
+CUDA libraries: 
+- CUBLAS: 13.1.0
+- CURAND: 10.4.2
+- CUFFT: 12.2.0
+- CUSOLVER: 12.1.0
+- CUSPARSE: 12.7.9
+- CUPTI: 2026.1.0 (API 13.2.0)
+- NVML: 13.0.0+580.95.5
+
+Julia packages: 
+- CUDA: 5.11.0
+- GPUArrays: 11.4.1
+- GPUCompiler: 1.8.2
+- KernelAbstractions: 0.9.40
+- CUDA_Driver_jll: 13.2.0+0
+- CUDA_Compiler_jll: 0.4.2+0
+- CUDA_Runtime_jll: 0.21.0+0
+
+Toolchain:
+- Julia: 1.12.5
+- LLVM: 18.1.7
+
+1 device:
+  0: NVIDIA GeForce RTX 3060 (sm_86, 11.626 GiB / 12.000 GiB available)
+```
+
+
+## Running Tests
 ```julia
 import Pkg
 Pkg.test()
