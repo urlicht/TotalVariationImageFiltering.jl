@@ -11,3 +11,6 @@ CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 
 [extensions]
 TVImageFilteringCUDAExt = "CUDA"
+
+[compat]
+Random = "~1.11.0"
