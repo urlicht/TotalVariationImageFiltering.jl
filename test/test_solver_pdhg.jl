@@ -152,6 +152,109 @@ end
     @test stats0.rel_change == 0.0
 end
 
+@testset "PDHG Primal Constraints" begin
+    cfg = TVImageFiltering.PDHGConfig(
+        maxiter = 5000,
+        tau = 0.15,
+        sigma = 0.15,
+        theta = 1.0,
+        tol = 1e-7,
+        check_every = 20,
+    )
+
+    Random.seed!(75)
+    f_l2 = 1.5 .* randn(Float64, 26, 18) .- 0.4
+
+    prob_nonneg = TVImageFiltering.TVProblem(
+        f_l2;
+        lambda = 0.08,
+        data_fidelity = TVImageFiltering.L2Fidelity(),
+        constraint = TVImageFiltering.NonnegativeConstraint(),
+    )
+    u_nonneg, st_nonneg = TVImageFiltering.solve(prob_nonneg, cfg)
+    @test st_nonneg.converged
+    @test minimum(u_nonneg) >= -1e-10
+
+    box = TVImageFiltering.BoxConstraint(-0.2, 0.65)
+    prob_box = TVImageFiltering.TVProblem(
+        f_l2;
+        lambda = 0.08,
+        data_fidelity = TVImageFiltering.L2Fidelity(),
+        constraint = box,
+    )
+    u_box, st_box = TVImageFiltering.solve(prob_box, cfg)
+    @test st_box.converged
+    @test minimum(u_box) >= box.lower - 1e-10
+    @test maximum(u_box) <= box.upper + 1e-10
+
+    prob_box_lambda0 = TVImageFiltering.TVProblem(
+        f_l2;
+        lambda = 0.0,
+        data_fidelity = TVImageFiltering.L2Fidelity(),
+        constraint = box,
+    )
+    u_box0, st_box0 =
+        TVImageFiltering.solve(prob_box_lambda0, cfg; init = fill(4.0, size(f_l2)))
+    @test st_box0.iterations == 0
+    @test st_box0.converged
+    @test st_box0.rel_change == 0.0
+    @test u_box0 == clamp.(f_l2, box.lower, box.upper)
+
+    f_poisson = rand(Float64, 24, 17) .* 1.8 .+ 0.05
+    pbox = TVImageFiltering.BoxConstraint(0.15, 0.95)
+    prob_poisson_box = TVImageFiltering.TVProblem(
+        f_poisson;
+        lambda = 0.07,
+        data_fidelity = TVImageFiltering.PoissonFidelity(),
+        constraint = pbox,
+    )
+    u_poisson_box, st_poisson_box = TVImageFiltering.solve(prob_poisson_box, cfg)
+    @test st_poisson_box.converged
+    @test minimum(u_poisson_box) >= pbox.lower - 1e-10
+    @test maximum(u_poisson_box) <= pbox.upper + 1e-10
+
+    prob_poisson_box_lambda0 = TVImageFiltering.TVProblem(
+        f_poisson;
+        lambda = 0.0,
+        data_fidelity = TVImageFiltering.PoissonFidelity(),
+        constraint = pbox,
+    )
+    u_poisson_box0, st_poisson_box0 =
+        TVImageFiltering.solve(prob_poisson_box_lambda0, cfg; init = fill(2.0, size(f_poisson)))
+    @test st_poisson_box0.iterations == 0
+    @test st_poisson_box0.converged
+    @test st_poisson_box0.rel_change == 0.0
+    @test u_poisson_box0 == clamp.(f_poisson, pbox.lower, pbox.upper)
+
+    infeasible_negative = TVImageFiltering.TVProblem(
+        f_poisson;
+        lambda = 0.1,
+        data_fidelity = TVImageFiltering.PoissonFidelity(),
+        constraint = TVImageFiltering.BoxConstraint(-1.0, -0.1),
+    )
+    @test_throws ArgumentError TVImageFiltering.solve(infeasible_negative, cfg)
+
+    infeasible_zero = TVImageFiltering.TVProblem(
+        f_poisson;
+        lambda = 0.1,
+        data_fidelity = TVImageFiltering.PoissonFidelity(),
+        constraint = TVImageFiltering.BoxConstraint(-1.0, 0.0),
+    )
+    @test_throws ArgumentError TVImageFiltering.solve(infeasible_zero, cfg)
+
+    zero_data = zeros(Float64, 6, 6)
+    feasible_zero = TVImageFiltering.TVProblem(
+        zero_data;
+        lambda = 0.0,
+        data_fidelity = TVImageFiltering.PoissonFidelity(),
+        constraint = TVImageFiltering.BoxConstraint(-1.0, 0.0),
+    )
+    u_zero, st_zero = TVImageFiltering.solve(feasible_zero, cfg; init = fill(9.0, size(zero_data)))
+    @test st_zero.iterations == 0
+    @test st_zero.converged
+    @test u_zero == zero_data
+end
+
 @testset "PDHG State Reuse and Error Paths" begin
     f = randn(24)
     prob = TVImageFiltering.TVProblem(
@@ -207,6 +310,7 @@ end
         TVImageFiltering.L2Fidelity(),
         TVImageFiltering.IsotropicTV(),
         TVImageFiltering.Neumann(),
+        TVImageFiltering.NoConstraint(),
     )
     @test_throws ArgumentError TVImageFiltering.solve(negative_lambda_prob, cfg)
 end
@@ -248,6 +352,18 @@ end
     @test stats_batch.iterations == maximum(st.iterations for st in per_stats)
     @test stats_batch.converged == all(st.converged for st in per_stats)
     @test stats_batch.rel_change == maximum(st.rel_change for st in per_stats)
+
+    constrained_box = TVImageFiltering.BoxConstraint(-0.1, 0.3)
+    u_batch_constrained, stats_batch_constrained = TVImageFiltering.solve_batch(
+        f_batch,
+        config;
+        lambda = 0.15,
+        tv_mode = TVImageFiltering.IsotropicTV(),
+        constraint = constrained_box,
+    )
+    @test stats_batch_constrained.iterations <= config.maxiter
+    @test minimum(u_batch_constrained) >= constrained_box.lower - 1e-10
+    @test maximum(u_batch_constrained) <= constrained_box.upper + 1e-10
 
     states = [TVImageFiltering.PDHGState(selectdim(f_batch, 3, b)) for b = 1:size(f_batch, 3)]
     u1, st1 = TVImageFiltering.solve_batch(

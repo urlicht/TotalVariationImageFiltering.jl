@@ -130,6 +130,54 @@ using TVImageFiltering
             atol = 1.5f-3,
         )
 
+        box_constraint = TVImageFiltering.BoxConstraint(0.05f0, 0.8f0)
+        prob_cpu_pdhg_box = TVImageFiltering.TVProblem(
+            f_cpu;
+            lambda = 0.12f0,
+            data_fidelity = TVImageFiltering.L2Fidelity(),
+            tv_mode = TVImageFiltering.IsotropicTV(),
+            constraint = box_constraint,
+        )
+        u_cpu_pdhg_box, stats_cpu_pdhg_box = TVImageFiltering.solve(prob_cpu_pdhg_box, pdhg_config)
+        prob_gpu_pdhg_box = TVImageFiltering.TVProblem(
+            f_gpu;
+            lambda = 0.12f0,
+            data_fidelity = TVImageFiltering.L2Fidelity(),
+            tv_mode = TVImageFiltering.IsotropicTV(),
+            constraint = box_constraint,
+        )
+        u_gpu_pdhg_box, stats_gpu_pdhg_box = TVImageFiltering.solve(prob_gpu_pdhg_box, pdhg_config)
+
+        @test stats_cpu_pdhg_box.iterations <= pdhg_config.maxiter
+        @test stats_gpu_pdhg_box.iterations <= pdhg_config.maxiter
+        @test minimum(Array(u_gpu_pdhg_box)) >= box_constraint.lower - 1.0f-5
+        @test maximum(Array(u_gpu_pdhg_box)) <= box_constraint.upper + 1.0f-5
+        @test isapprox(Array(u_gpu_pdhg_box), u_cpu_pdhg_box; rtol = 8.0f-4, atol = 8.0f-4)
+
+        prob_gpu_pdhg_box_lambda0 = TVImageFiltering.TVProblem(
+            f_gpu;
+            lambda = 0.0f0,
+            data_fidelity = TVImageFiltering.L2Fidelity(),
+            tv_mode = TVImageFiltering.IsotropicTV(),
+            constraint = box_constraint,
+        )
+        u_gpu_pdhg_box0, stats_gpu_pdhg_box0 = TVImageFiltering.solve(
+            prob_gpu_pdhg_box_lambda0,
+            pdhg_config;
+            init = CUDA.fill(5.0f0, size(f_gpu)),
+        )
+        @test stats_gpu_pdhg_box0.iterations == 0
+        @test stats_gpu_pdhg_box0.converged
+        @test Array(u_gpu_pdhg_box0) == clamp.(f_cpu, box_constraint.lower, box_constraint.upper)
+
+        prob_gpu_rof_constrained = TVImageFiltering.TVProblem(
+            f_gpu;
+            lambda = 0.15f0,
+            tv_mode = TVImageFiltering.IsotropicTV(),
+            constraint = TVImageFiltering.NonnegativeConstraint(),
+        )
+        @test_throws ArgumentError TVImageFiltering.solve(prob_gpu_rof_constrained, config)
+
         f_batch_pdhg_cpu = rand(Float32, 32, 32, 3)
         f_batch_pdhg_gpu = CUDA.cu(f_batch_pdhg_cpu)
         u_batch_pdhg_cpu, stats_batch_pdhg_cpu = TVImageFiltering.solve_batch(
@@ -154,6 +202,25 @@ using TVImageFiltering
             u_batch_pdhg_cpu;
             rtol = 1.0f-3,
             atol = 1.0f-3,
+        )
+
+        u_batch_pdhg_gpu_box, stats_batch_pdhg_gpu_box = TVImageFiltering.solve_batch(
+            f_batch_pdhg_gpu,
+            pdhg_config;
+            lambda = 0.1f0,
+            data_fidelity = TVImageFiltering.L2Fidelity(),
+            tv_mode = TVImageFiltering.IsotropicTV(),
+            constraint = TVImageFiltering.BoxConstraint(-0.1f0, 0.2f0),
+        )
+        @test stats_batch_pdhg_gpu_box.iterations <= pdhg_config.maxiter
+        @test minimum(Array(u_batch_pdhg_gpu_box)) >= -0.10001f0
+        @test maximum(Array(u_batch_pdhg_gpu_box)) <= 0.20001f0
+
+        @test_throws ArgumentError TVImageFiltering.solve_batch(
+            f_batch_gpu,
+            config;
+            lambda = 0.15f0,
+            constraint = TVImageFiltering.NonnegativeConstraint(),
         )
     end
 end

@@ -180,6 +180,13 @@ end
         TVImageFiltering.TVProblem(f; lambda = 0.2, data_fidelity = DummyFidelityForROF())
     @test_throws ArgumentError TVImageFiltering.solve(bad_fidelity_prob)
 
+    constrained_prob = TVImageFiltering.TVProblem(
+        f;
+        lambda = 0.2,
+        constraint = TVImageFiltering.NonnegativeConstraint(),
+    )
+    @test_throws ArgumentError TVImageFiltering.solve(constrained_prob)
+
     bad_boundary_prob =
         TVImageFiltering.TVProblem(f; lambda = 0.2, boundary = DummyBoundaryForROF())
     @test_throws MethodError TVImageFiltering.solve(bad_boundary_prob)
@@ -206,6 +213,7 @@ end
         TVImageFiltering.L2Fidelity(),
         TVImageFiltering.IsotropicTV(),
         TVImageFiltering.Neumann(),
+        TVImageFiltering.NoConstraint(),
     )
     @test_throws ArgumentError TVImageFiltering.solve(
         negative_lambda_prob,

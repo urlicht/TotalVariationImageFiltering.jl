@@ -5,10 +5,30 @@ using TVImageFiltering
     @test TVImageFiltering.Neumann <: TVImageFiltering.AbstractBoundaryCondition
     @test TVImageFiltering.L2Fidelity <: TVImageFiltering.AbstractDataFidelity
     @test TVImageFiltering.PoissonFidelity <: TVImageFiltering.AbstractDataFidelity
+    @test TVImageFiltering.NoConstraint <: TVImageFiltering.AbstractPrimalConstraint
+    @test TVImageFiltering.NonnegativeConstraint <: TVImageFiltering.AbstractPrimalConstraint
+    @test TVImageFiltering.BoxConstraint <: TVImageFiltering.AbstractPrimalConstraint
     @test TVImageFiltering.IsotropicTV <: TVImageFiltering.AbstractTVMode
     @test TVImageFiltering.AnisotropicTV <: TVImageFiltering.AbstractTVMode
     @test TVImageFiltering.ROFConfig <: TVImageFiltering.AbstractTVSolver
     @test TVImageFiltering.PDHGConfig <: TVImageFiltering.AbstractTVSolver
+end
+
+@testset "Constraint Constructors" begin
+    no_constraint = TVImageFiltering.NoConstraint()
+    @test no_constraint isa TVImageFiltering.NoConstraint
+
+    nn_constraint = TVImageFiltering.NonnegativeConstraint()
+    @test nn_constraint isa TVImageFiltering.NonnegativeConstraint
+
+    box = TVImageFiltering.BoxConstraint(-1.0, 2.5f0)
+    @test box isa TVImageFiltering.BoxConstraint{Float64}
+    @test box.lower == -1.0
+    @test box.upper == 2.5
+
+    @test_throws ArgumentError TVImageFiltering.BoxConstraint(1.0, -1.0)
+    @test_throws ArgumentError TVImageFiltering.BoxConstraint(NaN, 1.0)
+    @test_throws ArgumentError TVImageFiltering.BoxConstraint(-1.0, NaN)
 end
 
 @testset "Common Config Validation" begin

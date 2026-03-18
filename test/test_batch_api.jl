@@ -84,4 +84,10 @@ end
         lambda = 0.1,
         state = states[1:2],
     )
+    @test_throws ArgumentError TVImageFiltering.solve_batch(
+        f_batch,
+        config;
+        lambda = 0.1,
+        constraint = TVImageFiltering.NonnegativeConstraint(),
+    )
 end
