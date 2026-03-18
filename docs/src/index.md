@@ -1,17 +1,46 @@
 # TVImageFiltering.jl
 
-`TVImageFiltering.jl` provides total-variation denoising tools for N-dimensional arrays.
+[![CI](https://github.com/urlicht/TVImageFiltering.jl/actions/workflows/ci.yml/badge.svg)](https://github.com/urlicht/TVImageFiltering.jl/actions/workflows/ci.yml)
+[![Docs](https://img.shields.io/badge/docs-latest-blue.svg)](https://urlicht.github.io/TVImageFiltering.jl/)
 
-## Documentation
+`TVImageFiltering.jl` is a Julia package for total-variation (TV) denoising and
+reconstruction on `N`-dimensional arrays.
 
-- [ROF Solver](rof-solver.md): mathematical formulation and the exact iterative process used by this package.
+It currently provides:
 
-## Quick Start
+- ROF denoising (`L2 + TV`) via Chambolle's dual projection algorithm.
+- PDHG / Chambolle-Pock for `L2 + TV` and Poisson `KL + TV`.
+- Isotropic and anisotropic TV.
+- Single-image and batched solves.
+- Automatic lambda selection for ROF (discrepancy principle and MC-SURE).
+- Optional CUDA acceleration via package extension.
 
-```julia
-using TVImageFiltering
+Core models:
 
-f = rand(Float32, 128, 128)
-problem = TVImageFiltering.TVProblem(f; lambda = 0.1f0)
-u, stats = TVImageFiltering.solve(problem, TVImageFiltering.ROFConfig())
+```math
+\min_u \frac{1}{2}\|u-f\|_2^2 + \lambda\,\mathrm{TV}(u)
 ```
+
+```math
+\min_u \sum_i \left(u_i - f_i \log(u_i)\right) + \lambda\,\mathrm{TV}(u)
+```
+
+## Documentation Guide
+
+- [Installation](installation.md)
+- [Quick Start](quick-start.md)
+- [Problem & API](problem-and-api.md)
+- [ROF Solver](rof-solver.md)
+- [PDHG Solver](pdhg-solver.md)
+- [Lambda Selection](lambda-selection.md)
+- [Batch & CUDA](batch-and-cuda.md)
+- [Benchmarking](benchmarking.md)
+- [API Reference](api-reference.md)
+- [References](references.md)
+
+## Notes
+
+- This manual consolidates and expands content from the repository
+  `README.md`, `benchmark/README.md`, source code, and docstrings.
+- For the latest benchmark runs, see the benchmark scripts and generated CSVs
+  in the repository.

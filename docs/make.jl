@@ -14,7 +14,16 @@ makedocs(
     ),
     pages = [
         "Home" => "index.md",
+        "Installation" => "installation.md",
+        "Quick Start" => "quick-start.md",
+        "Problem & API" => "problem-and-api.md",
         "ROF Solver" => "rof-solver.md",
+        "PDHG Solver" => "pdhg-solver.md",
+        "Lambda Selection" => "lambda-selection.md",
+        "Batch & CUDA" => "batch-and-cuda.md",
+        "Benchmarking" => "benchmarking.md",
+        "API Reference" => "api-reference.md",
+        "References" => "references.md",
     ],
 )
 

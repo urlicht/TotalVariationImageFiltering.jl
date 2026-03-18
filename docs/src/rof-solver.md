@@ -15,6 +15,8 @@ where `lambda >= 0` controls regularization strength.
 - `IsotropicTV`: `TV(u) = \sum_i \sqrt{\sum_d (\nabla_d u_i)^2}`
 - `AnisotropicTV`: `TV(u) = \sum_i \sum_d |\nabla_d u_i|`
 
+In this package, ROF is implemented for `L2Fidelity` only.
+
 ## Dual-Projection Iteration (Chambolle)
 
 The implementation follows a dual ascent + projection scheme. For dual field `p`,
@@ -32,7 +34,7 @@ p^{k+1} = \Pi_{\mathcal{B}}\!\left(p^k + \tau \nabla g^k\right),
 u^{k+1} = f - \lambda\,\operatorname{div}(p^{k+1}).
 ```
 
-Here `Pi_B` is projection onto the TV dual unit ball:
+Here `\Pi_{\mathcal{B}}` is projection onto the TV dual unit ball:
 
 - isotropic mode: `\|p_i\|_2 \le 1` per pixel/voxel `i`
 - anisotropic mode: `|p_{d,i}| \le 1` per component
@@ -53,6 +55,8 @@ For grid spacing `h_d = spacing[d]` and shape `n_d = size(f, d)`, the code enfor
 
 Dimensions with size `1` do not contribute to the bound.
 
+The solver checks this at runtime and throws an error if violated.
+
 ## Stopping Rule
 
 Convergence is checked every `check_every` iterations using:
@@ -63,6 +67,23 @@ Convergence is checked every `check_every` iterations using:
 ```
 
 The solver stops when `rel_change <= tol`, or at `maxiter`.
+
+## State Reuse Behavior
+
+`ROFState` stores both scratch arrays and dual variable state:
+
+- Reuse `state` to reduce allocations.
+- Dual variable `p` is intentionally carried across calls as warm start.
+- If shape or element type changes, construct a new `ROFState`.
+
+## Configuration Summary
+
+`ROFConfig` fields:
+
+- `maxiter`: maximum iterations.
+- `tau`: dual ascent step.
+- `tol`: tolerance on relative primal change.
+- `check_every`: convergence check frequency.
 
 ## References
 
