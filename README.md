@@ -17,13 +17,13 @@ Full manual: [https://urlicht.github.io/TVImageFiltering.jl/](https://urlicht.gi
 
 Recommended entry points:
 
-- [Quick Start](https://urlicht.github.io/TVImageFiltering.jl/quick-start/)
-- [Problem & API](https://urlicht.github.io/TVImageFiltering.jl/problem-and-api/)
-- [ROF Solver](https://urlicht.github.io/TVImageFiltering.jl/rof-solver/)
-- [PDHG Solver](https://urlicht.github.io/TVImageFiltering.jl/pdhg-solver/)
-- [Lambda Selection](https://urlicht.github.io/TVImageFiltering.jl/lambda-selection/)
-- [Batch & CUDA](https://urlicht.github.io/TVImageFiltering.jl/batch-and-cuda/)
-- [API Reference](https://urlicht.github.io/TVImageFiltering.jl/api-reference/)
+- [Quick Start](https://urlicht.github.io/TVImageFiltering.jl/stable/quick-start/)
+- [Problem & API](https://urlicht.github.io/TVImageFiltering.jl/stable/problem-and-api/)
+- [ROF Solver](https://urlicht.github.io/TVImageFiltering.jl/stable/rof-solver/)
+- [PDHG Solver](https://urlicht.github.io/TVImageFiltering.jl/stable/pdhg-solver/)
+- [Lambda Selection](https://urlicht.github.io/TVImageFiltering.jl/stable/lambda-selection/)
+- [Batch & CUDA](https://urlicht.github.io/TVImageFiltering.jl/stable/batch-and-cuda/)
+- [API Reference](https://urlicht.github.io/TVImageFiltering.jl/stable/api-reference/)
 
 ## Features
 
