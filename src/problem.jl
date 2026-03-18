@@ -3,6 +3,12 @@ TV-based reconstruction/denoising
 `min_u data_fidelity(u, f) + lambda * TV(u)`
 
 `spacing[d]` is the physical grid spacing along axis `d` used by differential operators.
+
+`TVProblem` is immutable, but `f` is stored by reference.
+For repeated solves on same shape/eltype data, mutate `f` in place (for example,
+`copyto!(problem.f, new_f)`) and reuse the same `TVProblem`.
+If you need a different `f` array object or different metadata (`lambda`,
+`spacing`, `data_fidelity`, `tv_mode`, `boundary`), construct a new `TVProblem`.
 """
 struct TVProblem{
     T<:AbstractFloat,

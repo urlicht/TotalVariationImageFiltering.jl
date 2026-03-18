@@ -52,6 +52,13 @@ end
 
 """
 Reusable workspace for the ROF dual projection solver.
+
+`ROFState` serves two roles:
+- scratch buffers (`u`, `u_prev`, `divp`, `g`, `grad_g`) reused every call,
+- warm-start storage for the dual variable `p`.
+
+When the same `state` object is passed to repeated `solve!` calls, `p` is not
+reset between calls.
 """
 struct ROFState{T<:AbstractFloat,N,A<:AbstractArray{T,N},G<:NTuple{N,A}}
     u::A
@@ -132,6 +139,15 @@ end
 Run ROF denoising in place.
 
 `u` is both the initial guess and output buffer.
+
+State and buffer reuse:
+- Reuse `u` and `state` across calls to avoid allocations.
+- `u` is copied into solver state and acts as primal warm start.
+- `state.p` is reused as dual warm start and is not reset by `solve!`.
+- For new image data with the same array storage, update in place with
+  `copyto!(problem.f, new_f)` and call `solve!` again.
+- If image array object, shape/eltype, or problem metadata changes, create a
+  new `TVProblem` (and a new `ROFState` only when shape/eltype changes).
 
 The implementation follows Chambolle's dual projection method for the ROF model.
 With dual variable `p` and image `f`, each iteration computes:
