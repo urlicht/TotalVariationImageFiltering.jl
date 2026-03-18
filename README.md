@@ -6,14 +6,22 @@
 ![x slice showing a comparison: original, noisy, denoised](docs/img/demo2.png)
 
 
-It currently implements the ROF model with Chambolle's dual projection method:
+It supports:
+
+- ROF denoising (`L2 + TV`) with Chambolle's dual projection method
+- PDHG / Chambolle-Pock for both `L2 + TV` and Poisson `KL + TV`
 
 ```math
 \min_u \frac{1}{2}\|u-f\|_2^2 + \lambda \, \mathrm{TV}(u)
 ```
 
+```math
+\min_u \sum_i \left(u_i - f_i \log(u_i)\right) + \lambda \, \mathrm{TV}(u)
+```
+
 The package supports:
 - N-dimensional `AbstractArray{T,N}` inputs (`T <: AbstractFloat`)
+- `L2Fidelity()` and `PoissonFidelity()` data terms
 - Isotropic and anisotropic TV
 - Configurable grid spacing
 - Single-image and batched solves
@@ -105,6 +113,8 @@ problem = TVImageFiltering.TVProblem(
 
 ```julia
 u, stats = TVImageFiltering.solve(problem, TVImageFiltering.ROFConfig(); init = nothing)
+# or
+u, stats = TVImageFiltering.solve(problem, TVImageFiltering.PDHGConfig(); init = nothing)
 ```
 
 `stats` is `SolverStats(iterations, converged, rel_change)`.
@@ -112,19 +122,21 @@ u, stats = TVImageFiltering.solve(problem, TVImageFiltering.ROFConfig(); init = 
 ### Solving in-place
 
 ```julia
-stats = TVImageFiltering.solve!(u, problem, TVImageFiltering.ROFConfig(); state = nothing)
+stats = TVImageFiltering.solve!(u, problem, TVImageFiltering.PDHGConfig(); state = nothing)
 ```
 
-Use `state = TVImageFiltering.ROFState(reference_array)` to reuse buffers across repeated calls.
+Use `state = TVImageFiltering.ROFState(reference_array)` or
+`state = TVImageFiltering.PDHGState(reference_array)` to reuse buffers across repeated calls.
 
 ### Solving a batch
 
 ```julia
 u_batch, stats = TVImageFiltering.solve_batch(
     f_batch,
-    TVImageFiltering.ROFConfig();
+    TVImageFiltering.PDHGConfig();
     lambda = 0.1,
     spacing = nothing,
+    data_fidelity = TVImageFiltering.PoissonFidelity(),
     tv_mode = TVImageFiltering.IsotropicTV(),
 )
 ```
@@ -219,12 +231,13 @@ Batch solving on GPU is also supported via `solve_batch` with `CuArray` input.
 
 ## Current Scope and Constraints
 
-- Implemented solver: `ROFConfig` (ROF denoising model)
-- Supported data fidelity in solver: `L2Fidelity`
+- Implemented solvers:
+  - `ROFConfig` for `L2Fidelity` (ROF model)
+  - `PDHGConfig` for `L2Fidelity` and `PoissonFidelity`
 - Boundary condition implementation: `Neumann`
-- `tau` must satisfy the stability bound:
-  - `tau < 1 / (2 * sum(h_d^(-2)))` over spatial dimensions with size > 1
-  - with unit spacing in 2D, this means `tau < 0.25`
+- ROF requires `tau < 1 / (2 * sum(h_d^(-2)))` over active dimensions.
+- PDHG requires `tau * sigma * ||grad||^2 < 1` with bound
+  `||grad||^2 <= 4 * sum(h_d^(-2))` over active dimensions.
 
 ## References
 
