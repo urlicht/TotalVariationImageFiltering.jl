@@ -1,16 +1,16 @@
 # API Reference
 
 ```@meta
-CurrentModule = TVImageFiltering
+CurrentModule = TotalVariationImageFiltering
 ```
 
-`TVImageFiltering.jl` does not currently export symbols, so call APIs with the
-`TVImageFiltering.` prefix in user code.
+`TotalVariationImageFiltering.jl` does not currently export symbols, so call APIs with the
+`TotalVariationImageFiltering.` prefix in user code.
 
 ## Module
 
 ```@docs
-TVImageFiltering
+TotalVariationImageFiltering
 ```
 
 ## Types

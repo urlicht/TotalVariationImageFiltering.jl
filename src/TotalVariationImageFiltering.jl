@@ -1,5 +1,5 @@
 """
-TVImageFiltering.jl provides total-variation denoising primitives for
+TotalVariationImageFiltering.jl provides total-variation denoising primitives for
 N-dimensional arrays.
 
 Main entry points:
@@ -7,7 +7,7 @@ Main entry points:
 - `solve(problem, config)` / `solve!(u, problem, config)`
 - `solve_batch(...)` / `solve_batch!(...)`
 """
-module TVImageFiltering
+module TotalVariationImageFiltering
 
 include("types.jl")
 include("problem.jl")
@@ -16,4 +16,4 @@ include("solvers/solvers.jl")
 include("api.jl")
 include("lambda_selection.jl")
 
-end # module TVImageFiltering
+end # module TotalVariationImageFiltering

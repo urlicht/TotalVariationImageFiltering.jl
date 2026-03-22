@@ -1,5 +1,5 @@
 using Test
-using TVImageFiltering
+using TotalVariationImageFiltering
 
 include("test_types.jl")
 include("test_problem.jl")

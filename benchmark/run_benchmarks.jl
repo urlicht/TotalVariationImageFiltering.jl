@@ -5,7 +5,7 @@ using Dates
 using Printf
 using Random
 using TestImages
-using TVImageFiltering
+using TotalVariationImageFiltering
 
 const DEFAULT_SEED = 20260318
 const DEFAULT_OUTPUT = normpath(joinpath(@__DIR__, "results", "benchmark_results.csv"))
@@ -95,7 +95,7 @@ function benchmark_cases(; quick::Bool)
         (
             name = "cameraman-gaussian",
             image = "cameraman",
-            mode = TVImageFiltering.IsotropicTV(),
+            mode = TotalVariationImageFiltering.IsotropicTV(),
             lambda = 0.12f0,
             gaussian_sigma = 0.04f0,
             salt_pepper_prob = 0.00f0,
@@ -104,7 +104,7 @@ function benchmark_cases(; quick::Bool)
         (
             name = "pirate-gaussian",
             image = "pirate",
-            mode = TVImageFiltering.AnisotropicTV(),
+            mode = TotalVariationImageFiltering.AnisotropicTV(),
             lambda = 0.16f0,
             gaussian_sigma = 0.06f0,
             salt_pepper_prob = 0.00f0,
@@ -116,7 +116,7 @@ function benchmark_cases(; quick::Bool)
         (
             name = "cameraman-gaussian",
             image = "cameraman",
-            mode = TVImageFiltering.IsotropicTV(),
+            mode = TotalVariationImageFiltering.IsotropicTV(),
             lambda = 0.12f0,
             gaussian_sigma = 0.04f0,
             salt_pepper_prob = 0.00f0,
@@ -125,7 +125,7 @@ function benchmark_cases(; quick::Bool)
         (
             name = "pirate-gaussian",
             image = "pirate",
-            mode = TVImageFiltering.AnisotropicTV(),
+            mode = TotalVariationImageFiltering.AnisotropicTV(),
             lambda = 0.16f0,
             gaussian_sigma = 0.06f0,
             salt_pepper_prob = 0.00f0,
@@ -134,7 +134,7 @@ function benchmark_cases(; quick::Bool)
         (
             name = "woman_blonde-mixed",
             image = "woman_blonde",
-            mode = TVImageFiltering.IsotropicTV(),
+            mode = TotalVariationImageFiltering.IsotropicTV(),
             lambda = 0.14f0,
             gaussian_sigma = 0.03f0,
             salt_pepper_prob = 0.02f0,
@@ -143,7 +143,7 @@ function benchmark_cases(; quick::Bool)
         (
             name = "mri-stack-gaussian",
             image = "mri-stack",
-            mode = TVImageFiltering.IsotropicTV(),
+            mode = TotalVariationImageFiltering.IsotropicTV(),
             lambda = 0.10f0,
             gaussian_sigma = 0.02f0,
             salt_pepper_prob = 0.00f0,
@@ -152,7 +152,7 @@ function benchmark_cases(; quick::Bool)
         (
             name = "resolution_test_1920-large",
             image = "resolution_test_1920",
-            mode = TVImageFiltering.IsotropicTV(),
+            mode = TotalVariationImageFiltering.IsotropicTV(),
             lambda = 0.10f0,
             gaussian_sigma = 0.02f0,
             salt_pepper_prob = 0.00f0,
@@ -300,12 +300,12 @@ function run_cpu_benchmarks(cfg::BenchConfig, cases, rows)
 
     for case in cases
         dims = dims_string(size(case.noisy))
-        problem = TVImageFiltering.TVProblem(
+        problem = TotalVariationImageFiltering.TVProblem(
             case.noisy;
             lambda = case.lambda,
             tv_mode = case.mode,
         )
-        solver_cfg = TVImageFiltering.ROFConfig(
+        solver_cfg = TotalVariationImageFiltering.ROFConfig(
             maxiter = maxiter,
             tau = 0.1f0,
             tol = 0.0f0,
@@ -313,21 +313,21 @@ function run_cpu_benchmarks(cfg::BenchConfig, cases, rows)
         )
 
         u = similar(case.noisy)
-        state = TVImageFiltering.ROFState(case.noisy)
+        state = TotalVariationImageFiltering.ROFState(case.noisy)
 
-        TVImageFiltering.solve(problem, solver_cfg)
+        TotalVariationImageFiltering.solve(problem, solver_cfg)
         trial = run(
-            @benchmarkable TVImageFiltering.solve($problem, $solver_cfg) samples =
+            @benchmarkable TotalVariationImageFiltering.solve($problem, $solver_cfg) samples =
                 cfg.samples evals = cfg.evals
         )
         push_summary!(rows, "cpu", "solve_allocating", case.image, dims, cfg, trial)
 
         copyto!(u, case.noisy)
-        TVImageFiltering.solve!(u, problem, solver_cfg; state = state)
+        TotalVariationImageFiltering.solve!(u, problem, solver_cfg; state = state)
         trial = run(
             @benchmarkable begin
                 copyto!($u, $(case.noisy))
-                TVImageFiltering.solve!($u, $problem, $solver_cfg; state = $state)
+                TotalVariationImageFiltering.solve!($u, $problem, $solver_cfg; state = $state)
             end samples = cfg.samples evals = cfg.evals
         )
         push_summary!(rows, "cpu", "solve_state_reuse", case.image, dims, cfg, trial)
@@ -340,7 +340,7 @@ function maybe_load_cuda()
         @eval using CUDA
         cuda = Base.invokelatest(() -> getfield(@__MODULE__, :CUDA))
         Base.invokelatest(cuda.functional) || return nothing
-        Base.get_extension(TVImageFiltering, :TVImageFilteringCUDAExt) === nothing &&
+        Base.get_extension(TotalVariationImageFiltering, :TotalVariationImageFilteringCUDAExt) === nothing &&
             return nothing
         return cuda
     catch
@@ -370,8 +370,8 @@ function _run_cuda_benchmarks_loaded(CUDA, cfg::BenchConfig, cases, rows)
         noisy_gpu = CUDA.CuArray(case.noisy)
 
         problem =
-            TVImageFiltering.TVProblem(noisy_gpu; lambda = case.lambda, tv_mode = case.mode)
-        solver_cfg = TVImageFiltering.ROFConfig(
+            TotalVariationImageFiltering.TVProblem(noisy_gpu; lambda = case.lambda, tv_mode = case.mode)
+        solver_cfg = TotalVariationImageFiltering.ROFConfig(
             maxiter = maxiter,
             tau = 0.1f0,
             tol = 0.0f0,
@@ -379,25 +379,25 @@ function _run_cuda_benchmarks_loaded(CUDA, cfg::BenchConfig, cases, rows)
         )
 
         u_gpu = similar(noisy_gpu)
-        state = TVImageFiltering.ROFState(noisy_gpu)
+        state = TotalVariationImageFiltering.ROFState(noisy_gpu)
 
-        TVImageFiltering.solve(problem, solver_cfg)
+        TotalVariationImageFiltering.solve(problem, solver_cfg)
         CUDA.synchronize()
         trial = run(
             @benchmarkable begin
-                TVImageFiltering.solve($problem, $solver_cfg)
+                TotalVariationImageFiltering.solve($problem, $solver_cfg)
                 CUDA.synchronize()
             end samples = cfg.samples evals = cfg.evals
         )
         push_summary!(rows, "cuda", "solve_allocating", case.image, dims, cfg, trial)
 
         copyto!(u_gpu, noisy_gpu)
-        TVImageFiltering.solve!(u_gpu, problem, solver_cfg; state = state)
+        TotalVariationImageFiltering.solve!(u_gpu, problem, solver_cfg; state = state)
         CUDA.synchronize()
         trial = run(
             @benchmarkable begin
                 copyto!($u_gpu, $noisy_gpu)
-                TVImageFiltering.solve!($u_gpu, $problem, $solver_cfg; state = $state)
+                TotalVariationImageFiltering.solve!($u_gpu, $problem, $solver_cfg; state = $state)
                 CUDA.synchronize()
             end samples = cfg.samples evals = cfg.evals
         )
@@ -479,7 +479,7 @@ function main()
     cases = prepare_cases(cfg)
     rows = NamedTuple[]
 
-    println("TVImageFiltering benchmark configuration:")
+    println("TotalVariationImageFiltering benchmark configuration:")
     println("  backend:  ", cfg.backend)
     println("  samples:  ", cfg.samples)
     println("  evals:    ", cfg.evals)

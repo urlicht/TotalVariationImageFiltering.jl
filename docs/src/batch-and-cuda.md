@@ -14,18 +14,18 @@ across spatial axes.
 Example:
 
 ```julia
-u_batch, stats = TVImageFiltering.solve_batch(
+u_batch, stats = TotalVariationImageFiltering.solve_batch(
     f_batch,
-    TVImageFiltering.ROFConfig();
+    TotalVariationImageFiltering.ROFConfig();
     lambda = 0.1,
-    tv_mode = TVImageFiltering.IsotropicTV(),
+    tv_mode = TotalVariationImageFiltering.IsotropicTV(),
 )
 ```
 
 For PDHG batch solves, you can additionally pass:
 
-- `constraint = TVImageFiltering.NonnegativeConstraint()`, or
-- `constraint = TVImageFiltering.BoxConstraint(lower, upper)`.
+- `constraint = TotalVariationImageFiltering.NonnegativeConstraint()`, or
+- `constraint = TotalVariationImageFiltering.BoxConstraint(lower, upper)`.
 
 Batch state reuse:
 
@@ -36,7 +36,7 @@ State vector length must match batch size.
 
 ## CUDA Extension
 
-The extension module `TVImageFilteringCUDAExt` is loaded automatically when:
+The extension module `TotalVariationImageFilteringCUDAExt` is loaded automatically when:
 
 - `CUDA.jl` is installed and loaded,
 - a functional CUDA runtime/device is available.
@@ -45,11 +45,11 @@ Example:
 
 ```julia
 using CUDA
-using TVImageFiltering
+using TotalVariationImageFiltering
 
 f_gpu = CUDA.rand(Float32, 256, 256)
-problem_gpu = TVImageFiltering.TVProblem(f_gpu; lambda = 0.15f0)
-u_gpu, stats_gpu = TVImageFiltering.solve(problem_gpu, TVImageFiltering.ROFConfig())
+problem_gpu = TotalVariationImageFiltering.TVProblem(f_gpu; lambda = 0.15f0)
+u_gpu, stats_gpu = TotalVariationImageFiltering.solve(problem_gpu, TotalVariationImageFiltering.ROFConfig())
 ```
 
 ## CUDA Coverage

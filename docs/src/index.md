@@ -1,9 +1,9 @@
-# TVImageFiltering.jl
+# TotalVariationImageFiltering.jl
 
-[![CI](https://github.com/urlicht/TVImageFiltering.jl/actions/workflows/ci.yml/badge.svg)](https://github.com/urlicht/TVImageFiltering.jl/actions/workflows/ci.yml)
-[![Docs](https://img.shields.io/badge/docs-latest-blue.svg)](https://urlicht.github.io/TVImageFiltering.jl/)
+[![CI](https://github.com/urlicht/TotalVariationImageFiltering.jl/actions/workflows/ci.yml/badge.svg)](https://github.com/urlicht/TotalVariationImageFiltering.jl/actions/workflows/ci.yml)
+[![Docs](https://img.shields.io/badge/docs-latest-blue.svg)](https://urlicht.github.io/TotalVariationImageFiltering.jl/)
 
-`TVImageFiltering.jl` is a Julia package for total-variation (TV) denoising and
+`TotalVariationImageFiltering.jl` is a Julia package for total-variation (TV) denoising and
 reconstruction on `N`-dimensional arrays.
 
 It currently provides:

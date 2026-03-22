@@ -1,9 +1,9 @@
-module TVImageFilteringCUDAExt
+module TotalVariationImageFilteringCUDAExt
 
 using CUDA
-using TVImageFiltering
+using TotalVariationImageFiltering
 
-import TVImageFiltering:
+import TotalVariationImageFiltering:
     AbstractPrimalConstraint,
     AbstractBoundaryCondition,
     AbstractDataFidelity,
@@ -368,7 +368,7 @@ function _pdhg_primal_and_overrelax!(
         )
     end
 
-    TVImageFiltering._project_interval!(state.u, lower, upper)
+    TotalVariationImageFiltering._project_interval!(state.u, lower, upper)
 
     CUDA.@cuda threads = threads blocks = blocks _pdhg_ubar_kernel!(
         state.u_bar,
@@ -605,7 +605,7 @@ function solve_batch!(
         return _zero_batch_stats(T, 0, return_per_item_stats)
     end
 
-    TVImageFiltering._validate(config)
+    TotalVariationImageFiltering._validate(config)
     data_fidelity isa L2Fidelity ||
         throw(ArgumentError("ROF currently supports only L2Fidelity"))
     constraint isa NoConstraint || throw(
@@ -624,12 +624,12 @@ function solve_batch!(
     end
 
     spatial_ndims = N - 1
-    spacing_t = TVImageFiltering._normalize_spacing(T, Val(spatial_ndims), spacing)
+    spacing_t = TotalVariationImageFiltering._normalize_spacing(T, Val(spatial_ndims), spacing)
     inv_spacing = ntuple(d -> inv(spacing_t[d]), Val(spatial_ndims))
     shape_spatial = ntuple(d -> size(f_batch, d), Val(spatial_ndims))
 
     tau_t = T(config.tau)
-    tau_upper = TVImageFiltering._tau_upper_bound(inv_spacing, shape_spatial)
+    tau_upper = TotalVariationImageFiltering._tau_upper_bound(inv_spacing, shape_spatial)
     tau_t < tau_upper || throw(
         ArgumentError(
             "tau must be < $(tau_upper) for this grid spacing and shape; got $(tau_t)",
@@ -676,7 +676,7 @@ function solve_batch!(
             mask_changed = false
             @views for b = 1:batch_count
                 done_host[b] == UInt8(1) && continue
-                rel = TVImageFiltering._relative_change(
+                rel = TotalVariationImageFiltering._relative_change(
                     selectdim(local_state.u_prev, N, b),
                     selectdim(local_state.u, N, b),
                 )
@@ -721,7 +721,7 @@ end
 
 function solve!(
     u::CUDA.CuArray{T,N},
-    problem::TVImageFiltering.TVProblem{T,N,AF,DF,TV,BC,PC},
+    problem::TotalVariationImageFiltering.TVProblem{T,N,AF,DF,TV,BC,PC},
     config::PDHGConfig;
     state::Union{Nothing,PDHGState{T,N}} = nothing,
 ) where {
@@ -733,9 +733,9 @@ function solve!(
     BC<:AbstractBoundaryCondition,
     PC<:AbstractPrimalConstraint,
 }
-    TVImageFiltering._validate(config)
-    TVImageFiltering._validate_pdhg_data_fidelity(problem)
-    TVImageFiltering._validate_pdhg_constraint(problem)
+    TotalVariationImageFiltering._validate(config)
+    TotalVariationImageFiltering._validate_pdhg_data_fidelity(problem)
+    TotalVariationImageFiltering._validate_pdhg_constraint(problem)
     problem.boundary isa Neumann ||
         throw(ArgumentError("PDHG CUDA currently supports only Neumann boundary"))
     size(u) == size(problem.f) ||
@@ -743,13 +743,13 @@ function solve!(
     problem.lambda >= zero(T) ||
         throw(ArgumentError("lambda must be non-negative, got $(problem.lambda)"))
 
-    primal_lower, primal_upper = TVImageFiltering._pdhg_primal_bounds(problem)
+    primal_lower, primal_upper = TotalVariationImageFiltering._pdhg_primal_bounds(problem)
 
     local_state = state === nothing ? nothing : state
-    local_state === nothing || TVImageFiltering._validate_state_shape(local_state, size(u))
+    local_state === nothing || TotalVariationImageFiltering._validate_state_shape(local_state, size(u))
 
     if problem.lambda == zero(T)
-        TVImageFiltering._pdhg_data_minimizer!(
+        TotalVariationImageFiltering._pdhg_data_minimizer!(
             u,
             problem.f,
             problem.data_fidelity,
@@ -766,7 +766,7 @@ function solve!(
     theta_t = T(config.theta)
     inv_spacing = ntuple(d -> inv(problem.spacing[d]), Val(N))
 
-    op_norm_sq = TVImageFiltering._pdhg_operator_norm_sq_upper_bound(inv_spacing, size(problem.f))
+    op_norm_sq = TotalVariationImageFiltering._pdhg_operator_norm_sq_upper_bound(inv_spacing, size(problem.f))
     if op_norm_sq > zero(T)
         tau_t * sigma_t * op_norm_sq < one(T) || throw(
             ArgumentError(
@@ -804,7 +804,7 @@ function solve!(
         )
 
         if (k % config.check_every == 0) || (k == config.maxiter)
-            primal_rel_change = TVImageFiltering._relative_change(local_state.u_prev, local_state.u)
+            primal_rel_change = TotalVariationImageFiltering._relative_change(local_state.u_prev, local_state.u)
             pdhg_residual = _pdhg_relative_residual_cuda!(
                 local_state,
                 problem.boundary,
@@ -876,7 +876,7 @@ function _batch_pdhg_primal_bounds(
     data_fidelity::AbstractDataFidelity,
     constraint::AbstractPrimalConstraint,
 ) where {T<:AbstractFloat}
-    lower, upper = TVImageFiltering._constraint_bounds(T, constraint)
+    lower, upper = TotalVariationImageFiltering._constraint_bounds(T, constraint)
     if data_fidelity isa PoissonFidelity
         upper >= zero(T) || throw(
             ArgumentError(
@@ -985,7 +985,7 @@ function _pdhg_batch_step!(
             )
         end
 
-        TVImageFiltering._project_interval!(state.u, lower, upper)
+        TotalVariationImageFiltering._project_interval!(state.u, lower, upper)
 
         CUDA.@cuda threads = threads blocks = blocks _pdhg_ubar_if_active_kernel!(
             state.u_bar,
@@ -1030,7 +1030,7 @@ function _pdhg_batch_step!(
             )
         end
 
-        TVImageFiltering._project_interval!(state.u, lower, upper)
+        TotalVariationImageFiltering._project_interval!(state.u, lower, upper)
 
         CUDA.@cuda threads = threads blocks = blocks _pdhg_ubar_kernel!(
             state.u_bar,
@@ -1083,11 +1083,11 @@ function solve_batch!(
         return _zero_batch_stats(T, 0, return_per_item_stats)
     end
 
-    TVImageFiltering._validate(config)
+    TotalVariationImageFiltering._validate(config)
     boundary isa Neumann ||
         throw(ArgumentError("PDHG batch CUDA currently supports only Neumann boundary"))
     if data_fidelity isa PoissonFidelity
-        TVImageFiltering._validate_poisson_data(f_batch)
+        TotalVariationImageFiltering._validate_poisson_data(f_batch)
     elseif !(data_fidelity isa L2Fidelity)
         throw(
             ArgumentError(
@@ -1100,7 +1100,7 @@ function solve_batch!(
     lambda_t >= zero(T) || throw(ArgumentError("lambda must be non-negative"))
     primal_lower, primal_upper = _batch_pdhg_primal_bounds(f_batch, data_fidelity, constraint)
     if lambda_t == zero(T)
-        TVImageFiltering._pdhg_data_minimizer!(
+        TotalVariationImageFiltering._pdhg_data_minimizer!(
             u_batch,
             f_batch,
             data_fidelity,
@@ -1111,14 +1111,14 @@ function solve_batch!(
     end
 
     spatial_ndims = N - 1
-    spacing_t = TVImageFiltering._normalize_spacing(T, Val(spatial_ndims), spacing)
+    spacing_t = TotalVariationImageFiltering._normalize_spacing(T, Val(spatial_ndims), spacing)
     inv_spacing = ntuple(d -> inv(spacing_t[d]), Val(spatial_ndims))
     shape_spatial = ntuple(d -> size(f_batch, d), Val(spatial_ndims))
 
     tau_t = T(config.tau)
     sigma_t = T(config.sigma)
     theta_t = T(config.theta)
-    op_norm_sq = TVImageFiltering._pdhg_operator_norm_sq_upper_bound(inv_spacing, shape_spatial)
+    op_norm_sq = TotalVariationImageFiltering._pdhg_operator_norm_sq_upper_bound(inv_spacing, shape_spatial)
     if op_norm_sq > zero(T)
         tau_t * sigma_t * op_norm_sq < one(T) || throw(
             ArgumentError(
@@ -1195,7 +1195,7 @@ function solve_batch!(
                 done_host[b] == UInt8(1) && continue
                 slice_state = _pdhg_batch_slice_state(local_state, b)
                 primal_rel_change =
-                    TVImageFiltering._relative_change(slice_state.u_prev, slice_state.u)
+                    TotalVariationImageFiltering._relative_change(slice_state.u_prev, slice_state.u)
                 pdhg_residual = _pdhg_relative_residual_cuda!(
                     slice_state,
                     Neumann(),

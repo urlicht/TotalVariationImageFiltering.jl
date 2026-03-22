@@ -3,7 +3,7 @@
 ```julia
 using Random
 using Statistics
-using TVImageFiltering
+using TotalVariationImageFiltering
 
 Random.seed!(42)
 
@@ -15,21 +15,21 @@ clean[33:96, 33:96] .= 1f0
 # Add Gaussian noise
 noisy = clean .+ 0.15f0 * randn(Float32, n, m)
 
-problem = TVImageFiltering.TVProblem(
+problem = TotalVariationImageFiltering.TVProblem(
     noisy;
     lambda = 0.12f0,
-    tv_mode = TVImageFiltering.IsotropicTV(),
+    tv_mode = TotalVariationImageFiltering.IsotropicTV(),
     spacing = (1.0f0, 1.0f0),
 )
 
-config = TVImageFiltering.ROFConfig(
+config = TotalVariationImageFiltering.ROFConfig(
     maxiter = 1000,
     tau = 0.0625f0,
     tol = 1f-5,
     check_every = 10,
 )
 
-denoised, stats = TVImageFiltering.solve(problem, config)
+denoised, stats = TotalVariationImageFiltering.solve(problem, config)
 
 println("Converged: ", stats.converged)
 println("Iterations: ", stats.iterations)

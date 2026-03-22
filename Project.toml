@@ -1,4 +1,4 @@
-name = "TVImageFiltering"
+name = "TotalVariationImageFiltering"
 uuid = "a85ae5a6-60df-4598-b867-d7e55d5c417d"
 version = "0.1.0"
 authors = ["urlicht <urlicht@users.noreply.github.com>"]
@@ -10,7 +10,7 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 
 [extensions]
-TVImageFilteringCUDAExt = "CUDA"
+TotalVariationImageFilteringCUDAExt = "CUDA"
 
 [compat]
 Random = "~1.11.0"

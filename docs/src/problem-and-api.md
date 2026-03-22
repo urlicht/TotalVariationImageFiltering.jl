@@ -5,14 +5,14 @@
 Use `TVProblem` to define a denoising/reconstruction task:
 
 ```julia
-problem = TVImageFiltering.TVProblem(
+problem = TotalVariationImageFiltering.TVProblem(
     f;
     lambda,
     spacing = nothing,
-    data_fidelity = TVImageFiltering.L2Fidelity(),
-    tv_mode = TVImageFiltering.IsotropicTV(),
-    boundary = TVImageFiltering.Neumann(),
-    constraint = TVImageFiltering.NoConstraint(),
+    data_fidelity = TotalVariationImageFiltering.L2Fidelity(),
+    tv_mode = TotalVariationImageFiltering.IsotropicTV(),
+    boundary = TotalVariationImageFiltering.Neumann(),
+    constraint = TotalVariationImageFiltering.NoConstraint(),
 )
 ```
 
@@ -35,20 +35,20 @@ reuse the same `TVProblem`.
 Allocate output internally:
 
 ```julia
-u, stats = TVImageFiltering.solve(problem, TVImageFiltering.ROFConfig())
+u, stats = TotalVariationImageFiltering.solve(problem, TotalVariationImageFiltering.ROFConfig())
 ```
 
 Or in place:
 
 ```julia
 u = copy(problem.f)
-stats = TVImageFiltering.solve!(u, problem, TVImageFiltering.ROFConfig())
+stats = TotalVariationImageFiltering.solve!(u, problem, TotalVariationImageFiltering.ROFConfig())
 ```
 
 `stats` is:
 
 ```julia
-TVImageFiltering.SolverStats(iterations, converged, rel_change)
+TotalVariationImageFiltering.SolverStats(iterations, converged, rel_change)
 ```
 
 Supported solvers:
@@ -63,9 +63,9 @@ Supported solvers:
 For repeated solves, pass reusable workspace:
 
 ```julia
-state = TVImageFiltering.ROFState(problem.f)   # or PDHGState(problem.f)
+state = TotalVariationImageFiltering.ROFState(problem.f)   # or PDHGState(problem.f)
 u = copy(problem.f)
-stats = TVImageFiltering.solve!(u, problem, TVImageFiltering.ROFConfig(); state = state)
+stats = TotalVariationImageFiltering.solve!(u, problem, TotalVariationImageFiltering.ROFConfig(); state = state)
 ```
 
 Behavior:
@@ -81,12 +81,12 @@ Behavior:
 For arrays shaped `(spatial..., batch)`:
 
 ```julia
-u_batch, stats = TVImageFiltering.solve_batch(
+u_batch, stats = TotalVariationImageFiltering.solve_batch(
     f_batch,
-    TVImageFiltering.PDHGConfig();
+    TotalVariationImageFiltering.PDHGConfig();
     lambda = 0.1,
-    data_fidelity = TVImageFiltering.L2Fidelity(),
-    constraint = TVImageFiltering.BoxConstraint(0.0, 1.0),
+    data_fidelity = TotalVariationImageFiltering.L2Fidelity(),
+    constraint = TotalVariationImageFiltering.BoxConstraint(0.0, 1.0),
 )
 ```
 

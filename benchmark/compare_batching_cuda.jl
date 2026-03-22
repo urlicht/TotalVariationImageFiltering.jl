@@ -5,7 +5,7 @@ using Dates
 using Printf
 using Random
 using TestImages
-using TVImageFiltering
+using TotalVariationImageFiltering
 
 if Base.find_package("CUDA") !== nothing
     @eval using CUDA
@@ -133,8 +133,8 @@ function require_cuda!()
     )
     CUDA.functional() ||
         error("CUDA is installed but no functional CUDA device is available.")
-    Base.get_extension(TVImageFiltering, :TVImageFilteringCUDAExt) === nothing && error(
-        "TVImageFilteringCUDAExt is not active. Ensure CUDA is loaded before TVImageFiltering.",
+    Base.get_extension(TotalVariationImageFiltering, :TotalVariationImageFilteringCUDAExt) === nothing && error(
+        "TotalVariationImageFilteringCUDAExt is not active. Ensure CUDA is loaded before TotalVariationImageFiltering.",
     )
     return nothing
 end
@@ -193,19 +193,19 @@ end
 function run_no_batch!(
     outputs::Vector,
     problems::Vector,
-    solver_cfg::TVImageFiltering.ROFConfig,
+    solver_cfg::TotalVariationImageFiltering.ROFConfig,
     states::Vector,
 )
     @inbounds for i in eachindex(problems)
         copyto!(outputs[i], problems[i].f)
-        TVImageFiltering.solve!(outputs[i], problems[i], solver_cfg; state = states[i])
+        TotalVariationImageFiltering.solve!(outputs[i], problems[i], solver_cfg; state = states[i])
     end
     return nothing
 end
 
-function run_batched!(output, problem, solver_cfg::TVImageFiltering.ROFConfig, state)
+function run_batched!(output, problem, solver_cfg::TotalVariationImageFiltering.ROFConfig, state)
     copyto!(output, problem.f)
-    TVImageFiltering.solve!(output, problem, solver_cfg; state = state)
+    TotalVariationImageFiltering.solve!(output, problem, solver_cfg; state = state)
     return nothing
 end
 
@@ -266,7 +266,7 @@ function main()
     require_cuda!()
 
     clean = load_base_image(cfg.image_size)
-    solver_cfg = TVImageFiltering.ROFConfig(
+    solver_cfg = TotalVariationImageFiltering.ROFConfig(
         maxiter = cfg.maxiter,
         tau = cfg.tau,
         tol = 0.0f0,
@@ -304,26 +304,26 @@ function main()
         gpu_images = [CUDA.CuArray(img) for img in cpu_images]
 
         problems = [
-            TVImageFiltering.TVProblem(
+            TotalVariationImageFiltering.TVProblem(
                 img;
                 lambda = cfg.lambda,
-                tv_mode = TVImageFiltering.IsotropicTV(),
+                tv_mode = TotalVariationImageFiltering.IsotropicTV(),
             ) for img in gpu_images
         ]
         outputs = [similar(img) for img in gpu_images]
-        states = [TVImageFiltering.ROFState(img) for img in gpu_images]
+        states = [TotalVariationImageFiltering.ROFState(img) for img in gpu_images]
 
         stack_cpu = cat(cpu_images...; dims = 3)
         stack_gpu = CUDA.CuArray(stack_cpu)
         # Use large spacing on batch axis to suppress inter-sample coupling in batched mode.
-        batch_problem = TVImageFiltering.TVProblem(
+        batch_problem = TotalVariationImageFiltering.TVProblem(
             stack_gpu;
             lambda = cfg.lambda,
             spacing = (1.0f0, 1.0f0, 1.0f6),
-            tv_mode = TVImageFiltering.IsotropicTV(),
+            tv_mode = TotalVariationImageFiltering.IsotropicTV(),
         )
         batch_output = similar(stack_gpu)
-        batch_state = TVImageFiltering.ROFState(stack_gpu)
+        batch_state = TotalVariationImageFiltering.ROFState(stack_gpu)
 
         run_no_batch!(outputs, problems, solver_cfg, states)
         run_batched!(batch_output, batch_problem, solver_cfg, batch_state)

@@ -1,6 +1,6 @@
 # ROF Solver
 
-This page documents the ROF (`L2 + TV`) solver implemented in `TVImageFiltering.jl`.
+This page documents the ROF (`L2 + TV`) solver implemented in `TotalVariationImageFiltering.jl`.
 
 ## Variational Model
 

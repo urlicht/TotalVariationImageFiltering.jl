@@ -1,21 +1,21 @@
 using Test
 using Random
 using Statistics
-using TVImageFiltering
+using TotalVariationImageFiltering
 
-struct DummyFidelityForPDHG <: TVImageFiltering.AbstractDataFidelity end
+struct DummyFidelityForPDHG <: TotalVariationImageFiltering.AbstractDataFidelity end
 
 function tv_seminorm(
     u::AbstractArray{T,N},
     spacing::NTuple{N,T},
-    tv_mode::TVImageFiltering.AbstractTVMode,
+    tv_mode::TotalVariationImageFiltering.AbstractTVMode,
 ) where {T<:AbstractFloat,N}
-    g = TVImageFiltering.allocate_dual(u)
+    g = TotalVariationImageFiltering.allocate_dual(u)
     inv_spacing = ntuple(d -> inv(spacing[d]), Val(N))
-    TVImageFiltering.gradient!(g, u, TVImageFiltering.Neumann(), inv_spacing)
+    TotalVariationImageFiltering.gradient!(g, u, TotalVariationImageFiltering.Neumann(), inv_spacing)
 
     total = zero(T)
-    if tv_mode isa TVImageFiltering.IsotropicTV
+    if tv_mode isa TotalVariationImageFiltering.IsotropicTV
         @inbounds for i in eachindex(g[1])
             nrm2 = zero(T)
             for d = 1:N
@@ -77,22 +77,22 @@ function sample_poisson_normalized(
 end
 
 @testset "PDHG Internal Helpers" begin
-    @test TVImageFiltering._pdhg_operator_norm_sq_upper_bound((1.0, 2.0, 3.0), (8, 1, 5)) ==
+    @test TotalVariationImageFiltering._pdhg_operator_norm_sq_upper_bound((1.0, 2.0, 3.0), (8, 1, 5)) ==
           40.0
-    @test TVImageFiltering._pdhg_operator_norm_sq_upper_bound((1.0, 2.0), (1, 1)) == 0.0
+    @test TotalVariationImageFiltering._pdhg_operator_norm_sq_upper_bound((1.0, 2.0), (1, 1)) == 0.0
 end
 
 @testset "PDHG Primal Residual Sign Convention" begin
     # This test guards the sign in the primal residual:
     # r_p = (u_prev - u)/tau - K*(p_prev - p), with K* = -div => +div term.
     f = zeros(Float64, 6)
-    problem = TVImageFiltering.TVProblem(
+    problem = TotalVariationImageFiltering.TVProblem(
         f;
         lambda = 0.1,
         spacing = (0.5,),
-        data_fidelity = TVImageFiltering.L2Fidelity(),
+        data_fidelity = TotalVariationImageFiltering.L2Fidelity(),
     )
-    state = TVImageFiltering.PDHGState(f)
+    state = TotalVariationImageFiltering.PDHGState(f)
 
     state.u_prev .= [0.5, -1.0, 1.5, -2.0, 2.5, -3.0]
     state.u .= [0.0, 0.25, -0.5, 0.75, -1.0, 1.25]
@@ -106,30 +106,30 @@ end
     delta_u = state.u_prev .- state.u
     delta_p = (state.p_prev[1] .- state.p[1],)
     div_delta_p = similar(f)
-    TVImageFiltering.divergence!(div_delta_p, delta_p, problem.boundary, inv_spacing)
+    TotalVariationImageFiltering.divergence!(div_delta_p, delta_p, problem.boundary, inv_spacing)
     expected_primal = delta_u ./ tau .+ div_delta_p
 
-    _ = TVImageFiltering._pdhg_relative_residual!(state, problem, tau, sigma, inv_spacing)
+    _ = TotalVariationImageFiltering._pdhg_relative_residual!(state, problem, tau, sigma, inv_spacing)
     @test isapprox(state.primal_tmp, expected_primal; atol = 1e-12, rtol = 0.0)
 end
 
 @testset "PDHG L2 Matches ROF" begin
     Random.seed!(71)
     f = randn(32, 24)
-    prob = TVImageFiltering.TVProblem(
+    prob = TotalVariationImageFiltering.TVProblem(
         f;
         lambda = 0.18,
         spacing = (1.0, 0.75),
-        tv_mode = TVImageFiltering.IsotropicTV(),
+        tv_mode = TotalVariationImageFiltering.IsotropicTV(),
     )
 
-    rof_cfg = TVImageFiltering.ROFConfig(
+    rof_cfg = TotalVariationImageFiltering.ROFConfig(
         maxiter = 5000,
         tau = 0.05,
         tol = 1e-8,
         check_every = 20,
     )
-    pdhg_cfg = TVImageFiltering.PDHGConfig(
+    pdhg_cfg = TotalVariationImageFiltering.PDHGConfig(
         maxiter = 8000,
         tau = 0.12,
         sigma = 0.08,
@@ -138,8 +138,8 @@ end
         check_every = 20,
     )
 
-    u_rof, stats_rof = TVImageFiltering.solve(prob, rof_cfg)
-    u_pdhg, stats_pdhg = TVImageFiltering.solve(prob, pdhg_cfg)
+    u_rof, stats_rof = TotalVariationImageFiltering.solve(prob, rof_cfg)
+    u_pdhg, stats_pdhg = TotalVariationImageFiltering.solve(prob, pdhg_cfg)
 
     @test stats_rof.converged
     @test stats_pdhg.converged
@@ -149,15 +149,15 @@ end
 @testset "PDHG Poisson Fidelity" begin
     Random.seed!(73)
     f = rand(Float64, 28, 20) .* 2 .+ 0.2
-    mode = TVImageFiltering.AnisotropicTV()
+    mode = TotalVariationImageFiltering.AnisotropicTV()
 
-    prob = TVImageFiltering.TVProblem(
+    prob = TotalVariationImageFiltering.TVProblem(
         f;
         lambda = 0.12,
-        data_fidelity = TVImageFiltering.PoissonFidelity(),
+        data_fidelity = TotalVariationImageFiltering.PoissonFidelity(),
         tv_mode = mode,
     )
-    cfg = TVImageFiltering.PDHGConfig(
+    cfg = TotalVariationImageFiltering.PDHGConfig(
         maxiter = 4000,
         tau = 0.1,
         sigma = 0.1,
@@ -166,7 +166,7 @@ end
         check_every = 20,
     )
 
-    u, stats = TVImageFiltering.solve(prob, cfg)
+    u, stats = TotalVariationImageFiltering.solve(prob, cfg)
     obj_initial = poisson_data_term(f, f) + prob.lambda * tv_seminorm(f, prob.spacing, mode)
     obj_final = poisson_data_term(u, f) + prob.lambda * tv_seminorm(u, prob.spacing, mode)
 
@@ -175,8 +175,8 @@ end
     @test obj_final <= obj_initial + 1e-4
 
     prob_lambda0 =
-        TVImageFiltering.TVProblem(f; lambda = 0.0, data_fidelity = TVImageFiltering.PoissonFidelity())
-    u0, stats0 = TVImageFiltering.solve(prob_lambda0, cfg; init = fill(7.0, size(f)))
+        TotalVariationImageFiltering.TVProblem(f; lambda = 0.0, data_fidelity = TotalVariationImageFiltering.PoissonFidelity())
+    u0, stats0 = TotalVariationImageFiltering.solve(prob_lambda0, cfg; init = fill(7.0, size(f)))
     @test u0 == f
     @test stats0.iterations == 0
     @test stats0.converged
@@ -184,7 +184,7 @@ end
 end
 
 @testset "PDHG Primal Constraints" begin
-    cfg = TVImageFiltering.PDHGConfig(
+    cfg = TotalVariationImageFiltering.PDHGConfig(
         maxiter = 5000,
         tau = 0.15,
         sigma = 0.15,
@@ -196,91 +196,91 @@ end
     Random.seed!(75)
     f_l2 = 1.5 .* randn(Float64, 26, 18) .- 0.4
 
-    prob_nonneg = TVImageFiltering.TVProblem(
+    prob_nonneg = TotalVariationImageFiltering.TVProblem(
         f_l2;
         lambda = 0.08,
-        data_fidelity = TVImageFiltering.L2Fidelity(),
-        constraint = TVImageFiltering.NonnegativeConstraint(),
+        data_fidelity = TotalVariationImageFiltering.L2Fidelity(),
+        constraint = TotalVariationImageFiltering.NonnegativeConstraint(),
     )
-    u_nonneg, st_nonneg = TVImageFiltering.solve(prob_nonneg, cfg)
+    u_nonneg, st_nonneg = TotalVariationImageFiltering.solve(prob_nonneg, cfg)
     @test st_nonneg.converged
     @test minimum(u_nonneg) >= -1e-10
 
-    box = TVImageFiltering.BoxConstraint(-0.2, 0.65)
-    prob_box = TVImageFiltering.TVProblem(
+    box = TotalVariationImageFiltering.BoxConstraint(-0.2, 0.65)
+    prob_box = TotalVariationImageFiltering.TVProblem(
         f_l2;
         lambda = 0.08,
-        data_fidelity = TVImageFiltering.L2Fidelity(),
+        data_fidelity = TotalVariationImageFiltering.L2Fidelity(),
         constraint = box,
     )
-    u_box, st_box = TVImageFiltering.solve(prob_box, cfg)
+    u_box, st_box = TotalVariationImageFiltering.solve(prob_box, cfg)
     @test st_box.converged
     @test minimum(u_box) >= box.lower - 1e-10
     @test maximum(u_box) <= box.upper + 1e-10
 
-    prob_box_lambda0 = TVImageFiltering.TVProblem(
+    prob_box_lambda0 = TotalVariationImageFiltering.TVProblem(
         f_l2;
         lambda = 0.0,
-        data_fidelity = TVImageFiltering.L2Fidelity(),
+        data_fidelity = TotalVariationImageFiltering.L2Fidelity(),
         constraint = box,
     )
     u_box0, st_box0 =
-        TVImageFiltering.solve(prob_box_lambda0, cfg; init = fill(4.0, size(f_l2)))
+        TotalVariationImageFiltering.solve(prob_box_lambda0, cfg; init = fill(4.0, size(f_l2)))
     @test st_box0.iterations == 0
     @test st_box0.converged
     @test st_box0.rel_change == 0.0
     @test u_box0 == clamp.(f_l2, box.lower, box.upper)
 
     f_poisson = rand(Float64, 24, 17) .* 1.8 .+ 0.05
-    pbox = TVImageFiltering.BoxConstraint(0.15, 0.95)
-    prob_poisson_box = TVImageFiltering.TVProblem(
+    pbox = TotalVariationImageFiltering.BoxConstraint(0.15, 0.95)
+    prob_poisson_box = TotalVariationImageFiltering.TVProblem(
         f_poisson;
         lambda = 0.07,
-        data_fidelity = TVImageFiltering.PoissonFidelity(),
+        data_fidelity = TotalVariationImageFiltering.PoissonFidelity(),
         constraint = pbox,
     )
-    u_poisson_box, st_poisson_box = TVImageFiltering.solve(prob_poisson_box, cfg)
+    u_poisson_box, st_poisson_box = TotalVariationImageFiltering.solve(prob_poisson_box, cfg)
     @test st_poisson_box.converged
     @test minimum(u_poisson_box) >= pbox.lower - 1e-10
     @test maximum(u_poisson_box) <= pbox.upper + 1e-10
 
-    prob_poisson_box_lambda0 = TVImageFiltering.TVProblem(
+    prob_poisson_box_lambda0 = TotalVariationImageFiltering.TVProblem(
         f_poisson;
         lambda = 0.0,
-        data_fidelity = TVImageFiltering.PoissonFidelity(),
+        data_fidelity = TotalVariationImageFiltering.PoissonFidelity(),
         constraint = pbox,
     )
     u_poisson_box0, st_poisson_box0 =
-        TVImageFiltering.solve(prob_poisson_box_lambda0, cfg; init = fill(2.0, size(f_poisson)))
+        TotalVariationImageFiltering.solve(prob_poisson_box_lambda0, cfg; init = fill(2.0, size(f_poisson)))
     @test st_poisson_box0.iterations == 0
     @test st_poisson_box0.converged
     @test st_poisson_box0.rel_change == 0.0
     @test u_poisson_box0 == clamp.(f_poisson, pbox.lower, pbox.upper)
 
-    infeasible_negative = TVImageFiltering.TVProblem(
+    infeasible_negative = TotalVariationImageFiltering.TVProblem(
         f_poisson;
         lambda = 0.1,
-        data_fidelity = TVImageFiltering.PoissonFidelity(),
-        constraint = TVImageFiltering.BoxConstraint(-1.0, -0.1),
+        data_fidelity = TotalVariationImageFiltering.PoissonFidelity(),
+        constraint = TotalVariationImageFiltering.BoxConstraint(-1.0, -0.1),
     )
-    @test_throws ArgumentError TVImageFiltering.solve(infeasible_negative, cfg)
+    @test_throws ArgumentError TotalVariationImageFiltering.solve(infeasible_negative, cfg)
 
-    infeasible_zero = TVImageFiltering.TVProblem(
+    infeasible_zero = TotalVariationImageFiltering.TVProblem(
         f_poisson;
         lambda = 0.1,
-        data_fidelity = TVImageFiltering.PoissonFidelity(),
-        constraint = TVImageFiltering.BoxConstraint(-1.0, 0.0),
+        data_fidelity = TotalVariationImageFiltering.PoissonFidelity(),
+        constraint = TotalVariationImageFiltering.BoxConstraint(-1.0, 0.0),
     )
-    @test_throws ArgumentError TVImageFiltering.solve(infeasible_zero, cfg)
+    @test_throws ArgumentError TotalVariationImageFiltering.solve(infeasible_zero, cfg)
 
     zero_data = zeros(Float64, 6, 6)
-    feasible_zero = TVImageFiltering.TVProblem(
+    feasible_zero = TotalVariationImageFiltering.TVProblem(
         zero_data;
         lambda = 0.0,
-        data_fidelity = TVImageFiltering.PoissonFidelity(),
-        constraint = TVImageFiltering.BoxConstraint(-1.0, 0.0),
+        data_fidelity = TotalVariationImageFiltering.PoissonFidelity(),
+        constraint = TotalVariationImageFiltering.BoxConstraint(-1.0, 0.0),
     )
-    u_zero, st_zero = TVImageFiltering.solve(feasible_zero, cfg; init = fill(9.0, size(zero_data)))
+    u_zero, st_zero = TotalVariationImageFiltering.solve(feasible_zero, cfg; init = fill(9.0, size(zero_data)))
     @test st_zero.iterations == 0
     @test st_zero.converged
     @test u_zero == zero_data
@@ -288,14 +288,14 @@ end
 
 @testset "PDHG State Reuse and Error Paths" begin
     f = randn(24)
-    prob = TVImageFiltering.TVProblem(
+    prob = TotalVariationImageFiltering.TVProblem(
         f;
         lambda = 0.2,
-        tv_mode = TVImageFiltering.IsotropicTV(),
+        tv_mode = TotalVariationImageFiltering.IsotropicTV(),
     )
-    @test_throws ArgumentError TVImageFiltering.solve(
+    @test_throws ArgumentError TotalVariationImageFiltering.solve(
         prob,
-        TVImageFiltering.PDHGConfig(
+        TotalVariationImageFiltering.PDHGConfig(
             maxiter = 20,
             tau = 0.6,
             sigma = 0.6,
@@ -304,7 +304,7 @@ end
         ),
     )
 
-    cfg = TVImageFiltering.PDHGConfig(
+    cfg = TotalVariationImageFiltering.PDHGConfig(
         maxiter = 3000,
         tau = 0.2,
         sigma = 0.2,
@@ -312,44 +312,44 @@ end
         tol = 1e-8,
         check_every = 20,
     )
-    state = TVImageFiltering.PDHGState(f)
-    u1, s1 = TVImageFiltering.solve(prob, cfg; state = state)
-    u2, s2 = TVImageFiltering.solve(prob, cfg; init = fill(3.0, size(f)), state = state)
+    state = TotalVariationImageFiltering.PDHGState(f)
+    u1, s1 = TotalVariationImageFiltering.solve(prob, cfg; state = state)
+    u2, s2 = TotalVariationImageFiltering.solve(prob, cfg; init = fill(3.0, size(f)), state = state)
     @test s1.converged
     @test s2.converged
     @test maximum(abs.(u1 .- u2)) <= 1e-5
 
-    bad_poisson_prob = TVImageFiltering.TVProblem(
+    bad_poisson_prob = TotalVariationImageFiltering.TVProblem(
         [-0.1, 0.2];
         lambda = 0.1,
-        data_fidelity = TVImageFiltering.PoissonFidelity(),
+        data_fidelity = TotalVariationImageFiltering.PoissonFidelity(),
     )
-    @test_throws ArgumentError TVImageFiltering.solve(bad_poisson_prob, cfg)
+    @test_throws ArgumentError TotalVariationImageFiltering.solve(bad_poisson_prob, cfg)
 
     bad_fidelity_prob =
-        TVImageFiltering.TVProblem(f; lambda = 0.2, data_fidelity = DummyFidelityForPDHG())
-    @test_throws ArgumentError TVImageFiltering.solve(bad_fidelity_prob, cfg)
+        TotalVariationImageFiltering.TVProblem(f; lambda = 0.2, data_fidelity = DummyFidelityForPDHG())
+    @test_throws ArgumentError TotalVariationImageFiltering.solve(bad_fidelity_prob, cfg)
 
-    bad_state = TVImageFiltering.PDHGState(randn(12))
-    @test_throws ArgumentError TVImageFiltering.solve(prob, cfg; state = bad_state)
+    bad_state = TotalVariationImageFiltering.PDHGState(randn(12))
+    @test_throws ArgumentError TotalVariationImageFiltering.solve(prob, cfg; state = bad_state)
 
     # Bypass keyword constructor checks by calling the positional struct constructor directly.
-    negative_lambda_prob = TVImageFiltering.TVProblem(
+    negative_lambda_prob = TotalVariationImageFiltering.TVProblem(
         randn(24),
         -0.2,
         (1.0,),
-        TVImageFiltering.L2Fidelity(),
-        TVImageFiltering.IsotropicTV(),
-        TVImageFiltering.Neumann(),
-        TVImageFiltering.NoConstraint(),
+        TotalVariationImageFiltering.L2Fidelity(),
+        TotalVariationImageFiltering.IsotropicTV(),
+        TotalVariationImageFiltering.Neumann(),
+        TotalVariationImageFiltering.NoConstraint(),
     )
-    @test_throws ArgumentError TVImageFiltering.solve(negative_lambda_prob, cfg)
+    @test_throws ArgumentError TotalVariationImageFiltering.solve(negative_lambda_prob, cfg)
 end
 
 @testset "PDHG Batch API" begin
     Random.seed!(79)
     f_batch = randn(Float64, 12, 10, 4)
-    config = TVImageFiltering.PDHGConfig(
+    config = TotalVariationImageFiltering.PDHGConfig(
         maxiter = 2500,
         tau = 0.2,
         sigma = 0.2,
@@ -358,23 +358,23 @@ end
         check_every = 10,
     )
 
-    u_batch, stats_batch = TVImageFiltering.solve_batch(
+    u_batch, stats_batch = TotalVariationImageFiltering.solve_batch(
         f_batch,
         config;
         lambda = 0.15,
-        tv_mode = TVImageFiltering.IsotropicTV(),
+        tv_mode = TotalVariationImageFiltering.IsotropicTV(),
     )
 
     expected = similar(f_batch)
-    per_stats = TVImageFiltering.SolverStats{Float64}[]
+    per_stats = TotalVariationImageFiltering.SolverStats{Float64}[]
     @views for b = 1:size(f_batch, 3)
         fb = selectdim(f_batch, 3, b)
-        prob = TVImageFiltering.TVProblem(
+        prob = TotalVariationImageFiltering.TVProblem(
             fb;
             lambda = 0.15,
-            tv_mode = TVImageFiltering.IsotropicTV(),
+            tv_mode = TotalVariationImageFiltering.IsotropicTV(),
         )
-        ub, st = TVImageFiltering.solve(prob, config)
+        ub, st = TotalVariationImageFiltering.solve(prob, config)
         copyto!(selectdim(expected, 3, b), ub)
         push!(per_stats, st)
     end
@@ -384,11 +384,11 @@ end
     @test stats_batch.converged == all(st.converged for st in per_stats)
     @test stats_batch.rel_change == maximum(st.rel_change for st in per_stats)
 
-    u_batch_full, summary_stats, per_item_stats = TVImageFiltering.solve_batch(
+    u_batch_full, summary_stats, per_item_stats = TotalVariationImageFiltering.solve_batch(
         f_batch,
         config;
         lambda = 0.15,
-        tv_mode = TVImageFiltering.IsotropicTV(),
+        tv_mode = TotalVariationImageFiltering.IsotropicTV(),
         return_per_item_stats = true,
     )
     @test isapprox(u_batch_full, expected; rtol = 0.0, atol = 1e-8)
@@ -405,31 +405,31 @@ end
         @test per_item_stats[b].rel_change == per_stats[b].rel_change
     end
 
-    constrained_box = TVImageFiltering.BoxConstraint(-0.1, 0.3)
-    u_batch_constrained, stats_batch_constrained = TVImageFiltering.solve_batch(
+    constrained_box = TotalVariationImageFiltering.BoxConstraint(-0.1, 0.3)
+    u_batch_constrained, stats_batch_constrained = TotalVariationImageFiltering.solve_batch(
         f_batch,
         config;
         lambda = 0.15,
-        tv_mode = TVImageFiltering.IsotropicTV(),
+        tv_mode = TotalVariationImageFiltering.IsotropicTV(),
         constraint = constrained_box,
     )
     @test stats_batch_constrained.iterations <= config.maxiter
     @test minimum(u_batch_constrained) >= constrained_box.lower - 1e-10
     @test maximum(u_batch_constrained) <= constrained_box.upper + 1e-10
 
-    states = [TVImageFiltering.PDHGState(selectdim(f_batch, 3, b)) for b = 1:size(f_batch, 3)]
-    u1, st1 = TVImageFiltering.solve_batch(
+    states = [TotalVariationImageFiltering.PDHGState(selectdim(f_batch, 3, b)) for b = 1:size(f_batch, 3)]
+    u1, st1 = TotalVariationImageFiltering.solve_batch(
         f_batch,
         config;
         lambda = 0.15,
-        tv_mode = TVImageFiltering.AnisotropicTV(),
+        tv_mode = TotalVariationImageFiltering.AnisotropicTV(),
         state = states,
     )
-    u2, st2 = TVImageFiltering.solve_batch(
+    u2, st2 = TotalVariationImageFiltering.solve_batch(
         f_batch,
         config;
         lambda = 0.15,
-        tv_mode = TVImageFiltering.AnisotropicTV(),
+        tv_mode = TotalVariationImageFiltering.AnisotropicTV(),
         state = states,
         init = fill(3.0, size(f_batch)),
     )
@@ -437,14 +437,14 @@ end
     @test st2.converged
     @test maximum(abs.(u1 .- u2)) <= 1e-5
 
-    @test_throws ArgumentError TVImageFiltering.solve_batch(randn(8), config; lambda = 0.1)
-    @test_throws ArgumentError TVImageFiltering.solve_batch(
+    @test_throws ArgumentError TotalVariationImageFiltering.solve_batch(randn(8), config; lambda = 0.1)
+    @test_throws ArgumentError TotalVariationImageFiltering.solve_batch(
         f_batch,
         config;
         lambda = 0.1,
         init = zeros(12, 10, 3),
     )
-    @test_throws ArgumentError TVImageFiltering.solve_batch(
+    @test_throws ArgumentError TotalVariationImageFiltering.solve_batch(
         f_batch,
         config;
         lambda = 0.1,
@@ -463,8 +463,8 @@ end
     noisy = sample_poisson_normalized(rng, clean, scale)
 
     lambda = 0.12
-    mode = TVImageFiltering.IsotropicTV()
-    cfg = TVImageFiltering.PDHGConfig(
+    mode = TotalVariationImageFiltering.IsotropicTV()
+    cfg = TotalVariationImageFiltering.PDHGConfig(
         maxiter = 6000,
         tau = 0.15,
         sigma = 0.15,
@@ -473,21 +473,21 @@ end
         check_every = 20,
     )
 
-    prob_poisson = TVImageFiltering.TVProblem(
+    prob_poisson = TotalVariationImageFiltering.TVProblem(
         noisy;
         lambda = lambda,
-        data_fidelity = TVImageFiltering.PoissonFidelity(),
+        data_fidelity = TotalVariationImageFiltering.PoissonFidelity(),
         tv_mode = mode,
     )
-    prob_l2 = TVImageFiltering.TVProblem(
+    prob_l2 = TotalVariationImageFiltering.TVProblem(
         noisy;
         lambda = lambda,
-        data_fidelity = TVImageFiltering.L2Fidelity(),
+        data_fidelity = TotalVariationImageFiltering.L2Fidelity(),
         tv_mode = mode,
     )
 
-    u_poisson, st_poisson = TVImageFiltering.solve(prob_poisson, cfg)
-    u_l2, st_l2 = TVImageFiltering.solve(prob_l2, cfg)
+    u_poisson, st_poisson = TotalVariationImageFiltering.solve(prob_poisson, cfg)
+    u_l2, st_l2 = TotalVariationImageFiltering.solve(prob_l2, cfg)
 
     obj_poisson = poisson_data_term(u_poisson, noisy) +
                   lambda * tv_seminorm(u_poisson, prob_poisson.spacing, mode)

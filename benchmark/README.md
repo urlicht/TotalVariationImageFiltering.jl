@@ -1,4 +1,4 @@
-# Benchmarking TVImageFiltering
+# Benchmarking TotalVariationImageFiltering
 
 This benchmark suite is deterministic (fixed seed for synthetic noise) and reusable across machines/commits.
 

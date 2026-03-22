@@ -1,5 +1,5 @@
 using Test
-using TVImageFiltering
+using TotalVariationImageFiltering
 
 @testset "CUDA extension (optional)" begin
     cuda_loaded = false
@@ -13,7 +13,7 @@ using TVImageFiltering
     if !cuda_loaded || !CUDA.functional()
         @test true
     else
-        @test Base.get_extension(TVImageFiltering, :TVImageFilteringCUDAExt) !== nothing
+        @test Base.get_extension(TotalVariationImageFiltering, :TotalVariationImageFilteringCUDAExt) !== nothing
         include("cuda_extension/test_rof.jl")
         include("cuda_extension/test_batch_rof.jl")
         include("cuda_extension/test_pdhg_l2_poisson.jl")

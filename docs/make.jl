@@ -1,15 +1,15 @@
 using Documenter
-using TVImageFiltering
+using TotalVariationImageFiltering
 
 const CI = get(ENV, "CI", "false") == "true"
 
 makedocs(
-    modules = [TVImageFiltering],
-    sitename = "TVImageFiltering.jl",
+    modules = [TotalVariationImageFiltering],
+    sitename = "TotalVariationImageFiltering.jl",
     checkdocs = :none,
     format = Documenter.HTML(
         prettyurls = CI,
-        canonical = "https://urlicht.github.io/TVImageFiltering.jl",
+        canonical = "https://urlicht.github.io/TotalVariationImageFiltering.jl",
         edit_link = "main",
     ),
     pages = [
@@ -28,7 +28,7 @@ makedocs(
 )
 
 deploydocs(
-    repo = "github.com/urlicht/TVImageFiltering.jl.git",
+    repo = "github.com/urlicht/TotalVariationImageFiltering.jl.git",
     devbranch = "main",
     versions = [
         "stable" => "v^",

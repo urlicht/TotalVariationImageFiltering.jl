@@ -1,6 +1,6 @@
 # Lambda Selection
 
-`TVImageFiltering.jl` includes two ROF-specific parameter selection tools:
+`TotalVariationImageFiltering.jl` includes two ROF-specific parameter selection tools:
 
 - `select_lambda_discrepancy`
 - `select_lambda_sure`
@@ -26,11 +26,11 @@ Search strategy in code:
 Example:
 
 ```julia
-using TVImageFiltering
+using TotalVariationImageFiltering
 
-selection = TVImageFiltering.select_lambda_discrepancy(
+selection = TotalVariationImageFiltering.select_lambda_discrepancy(
     noisy,
-    TVImageFiltering.ROFConfig();
+    TotalVariationImageFiltering.ROFConfig();
     sigma = 0.12,
     lambda_min = 0.0,
     lambda_max = 0.2,
@@ -65,11 +65,11 @@ Example:
 
 ```julia
 using Random
-using TVImageFiltering
+using TotalVariationImageFiltering
 
-selection = TVImageFiltering.select_lambda_sure(
+selection = TotalVariationImageFiltering.select_lambda_sure(
     noisy,
-    TVImageFiltering.ROFConfig();
+    TotalVariationImageFiltering.ROFConfig();
     sigma = 0.12,
     lambda_grid = [0.0, 0.03, 0.06, 0.1, 0.16],
     mc_samples = 2,

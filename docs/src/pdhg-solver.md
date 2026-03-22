@@ -1,6 +1,6 @@
 # PDHG Solver
 
-This page documents the PDHG / Chambolle-Pock solver in `TVImageFiltering.jl`.
+This page documents the PDHG / Chambolle-Pock solver in `TotalVariationImageFiltering.jl`.
 
 ## Variational Form
 
