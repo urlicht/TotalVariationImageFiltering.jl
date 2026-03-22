@@ -15,4 +15,4 @@ TotalVariationImageFilteringCUDAExt = "CUDA"
 
 [compat]
 julia = "1.11"
-Random = "~1.11.0"
+Random = "1"
