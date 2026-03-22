@@ -20,6 +20,9 @@ jobs:
           - ubuntu-latest
         julia-version:
           - "1.12"
+          - "1.11"
+          - "1.10"
+          - "1.9"
 
     steps:
       - name: Checkout
