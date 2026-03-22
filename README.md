@@ -86,3 +86,7 @@ Pkg.test()
 ```
 
 CUDA tests run only when CUDA is installed and functional.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
