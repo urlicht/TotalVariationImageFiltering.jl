@@ -36,6 +36,10 @@ Recommended entry points:
 - Optional CUDA acceleration via package extension
 
 ## Installation
+From the registry:
+```julia
+] add TotalVariationImageFiltering
+```
 
 From this repository:
 
